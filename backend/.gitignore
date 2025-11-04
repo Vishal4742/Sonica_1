@@ -1,0 +1,11 @@
+target/
+songs.db
+songs/
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.ogg
+.DS_Store
+*.log
+
