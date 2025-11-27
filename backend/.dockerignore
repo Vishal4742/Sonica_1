@@ -1,0 +1,5 @@
+target/
+songs/
+temp/
+.git
+.env
