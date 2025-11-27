@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y ffmpeg openssl ca-certificates && rm -r
 COPY --from=builder /app/target/release/sonica-backend .
 COPY --from=builder /app/songs.db .
 
-# Expose the port
-ENV PORT=8080
-EXPOSE 8080
+# Expose the port (Hugging Face uses 7860 by default)
+ENV PORT=7860
+EXPOSE 7860
 
 CMD ["./sonica-backend"]
