@@ -13,7 +13,8 @@ export const recognizeAudio = async (audioBlob: Blob): Promise<RecognitionRespon
     formData.append('file', audioBlob, 'recording.wav');
 
     try {
-        const response = await fetch('/api/recognize', {
+        const API_URL = import.meta.env.VITE_API_URL || '/api';
+        const response = await fetch(`${API_URL}/recognize`, {
             method: 'POST',
             body: formData,
         });

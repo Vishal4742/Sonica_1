@@ -1,4 +1,14 @@
+---
+title: Sonica Backend
+emoji: 🎵
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # Sonica Backend
+
 
 Fast music recognition backend in Rust with MFCC fingerprinting, automatic preprocessing, and in-memory caching.
 
