@@ -1,20 +1,4 @@
-use once_cell::sync::OnceCell;
-use std::sync::RwLock;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SongFp {
-    pub id: i64,
-    pub title: String,
-    pub artist: String,
-    pub path: String,
-    pub fingerprint: Vec<f32>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ClipReq {
-    // Audio file will be handled via multipart form
-}
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct RecognitionResponse {
@@ -37,6 +21,3 @@ pub struct SongMetadata {
     pub path: String,
     pub created_at: String,
 }
-
-// Global in-memory cache for fingerprints
-pub static CACHE: OnceCell<RwLock<Vec<SongFp>>> = OnceCell::new();

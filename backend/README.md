@@ -1,25 +1,23 @@
-# Sonica Backend - Music Recognition API
+# Sonica Backend
 
-A fast and lightweight music recognition backend built in Rust with MFCC fingerprinting.
+Fast music recognition backend in Rust with MFCC fingerprinting, automatic preprocessing, and in-memory caching.
 
 ## Features
 
-- ✅ Fast music recognition using MFCC fingerprinting
-- ✅ Automatic audio preprocessing (FFmpeg)
-- ✅ In-memory fingerprint caching for instant recognition
-- ✅ Auto-detection of new songs via file watcher
-- ✅ REST API with Axum
-- ✅ SQLite database for persistence
+- **Fast Recognition**: < 0.5s recognition time using cosine similarity on MFCC fingerprints
+- **Auto-Detection**: Automatically processes new songs added to `songs/` directory
+- **In-Memory Cache**: All fingerprints loaded at startup for instant matching
+- **Multiple Formats**: Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS, WMA
 
 ## Prerequisites
 
 - Rust (stable)
-- FFmpeg installed and available in PATH
+- FFmpeg installed and in PATH
 
 ### Installing FFmpeg
 
 **Windows:**
-```powershell
+```bash
 choco install ffmpeg
 # or download from https://ffmpeg.org/download.html
 ```
@@ -31,123 +29,128 @@ brew install ffmpeg
 
 **Linux:**
 ```bash
-sudo apt-get update && sudo apt-get install ffmpeg
+sudo apt-get install ffmpeg
 ```
 
 ## Setup
 
-1. Clone the repository and navigate to the backend:
+1. Clone the repository
+2. Install dependencies:
 ```bash
 cd backend
-```
-
-2. Build the project:
-```bash
 cargo build --release
 ```
 
-3. Create the songs directory (if it doesn't exist):
+3. Create `songs/` directory (or it will be created automatically):
 ```bash
 mkdir songs
 ```
 
-4. Place audio files (MP3, WAV, FLAC, etc.) in the `songs/` directory
+4. Place audio files in `songs/` directory
 
-5. Run the server:
+## Running
+
 ```bash
 cargo run --release
 ```
 
-The server will start on `http://localhost:8000`
+Server will start on `http://0.0.0.0:8000`
 
 ## API Endpoints
 
-### Health Check
-```bash
-GET /health
+### `GET /health`
+Health check endpoint.
+
+**Response:**
+```json
+{"status": "ok"}
 ```
 
-### List All Songs
-```bash
-GET /songs
+### `GET /songs`
+Get list of all processed songs.
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "title": "Song Title",
+    "artist": "Artist Name",
+    "path": "songs/song.mp3",
+    "created_at": "2025-01-01 12:00:00"
+  }
+]
 ```
 
-### Recognize Audio Clip
-```bash
-POST /recognize
-Content-Type: multipart/form-data
+### `POST /recognize`
+Recognize an audio clip.
 
-# Form field: "audio" (audio file)
-```
+**Request:** Multipart form with field `audio` or `file` containing audio file
 
 **Response:**
 ```json
 {
   "match": {
-    "title": "Song Title",
-    "artist": "Artist Name",
+    "title": "Blinding Lights",
+    "artist": "The Weeknd",
     "score": 0.94
   }
 }
 ```
 
-### Upload Song
-```bash
-POST /upload
-Content-Type: multipart/form-data
+If no match found:
+```json
+{
+  "match": null
+}
+```
 
-# Form fields:
-# - "file" (audio file)
-# - "title" (optional)
-# - "artist" (optional)
+### `POST /upload`
+Upload a new song file.
+
+**Request:** Multipart form with:
+- `audio` or `file`: Audio file
+- `title` (optional): Song title
+- `artist` (optional): Artist name
+
+**Response:**
+```json
+{
+  "message": "Song uploaded and processing started",
+  "path": "songs/song.mp3",
+  "title": "Song Title",
+  "artist": "Artist Name"
+}
 ```
 
 ## How It Works
 
-1. **Startup**: Server loads all existing songs from the database and preprocesses any new files in the `songs/` directory
-2. **Fingerprinting**: Each song is processed to extract MFCC (Mel-frequency Cepstral Coefficients) features
-3. **Caching**: All fingerprints are loaded into memory for fast recognition
-4. **File Watcher**: Automatically detects new files in `songs/` and processes them
-5. **Recognition**: Audio clips are fingerprinted and matched against the cache using cosine similarity
+1. **Startup**: Server loads all existing songs from database and `songs/` directory
+2. **Preprocessing**: New songs are converted to mono 16kHz WAV using FFmpeg
+3. **Fingerprinting**: MFCC (Mel-Frequency Cepstral Coefficients) features are extracted
+4. **Caching**: All fingerprints stored in-memory for fast recognition
+5. **Recognition**: Query audio clip is fingerprinted and compared using cosine similarity
+6. **Auto-Detection**: File watcher automatically processes new files added to `songs/` directory
 
-## Performance
+## Performance Targets
 
-- Recognition: < 0.5 seconds
-- New song preprocessing: 1-2 seconds
-- Memory usage: < 50 MB for 1000 songs
-
-## Supported Audio Formats
-
-- MP3
-- WAV
-- FLAC
-- M4A
-- OGG
-- AAC
-- Opus
+- Recognition: < 0.5s
+- New Song Preprocessing: 1-2s
+- Startup Load (1000 songs): < 1.5s
+- Memory Usage: < 50 MB
 
 ## Deployment
 
-For Render.com deployment:
+For Render deployment:
 
-1. Set build command:
-```
-cargo build --release
-```
+1. Build command: `cargo build --release`
+2. Start command: `./target/release/sonica-backend`
+3. Install FFmpeg: `apt-get update && apt-get install -y ffmpeg`
+4. Expose port: 8000
 
-2. Set start command:
-```
-./target/release/sonica-backend
-```
+## Notes
 
-3. Install FFmpeg in build:
-```
-apt-get update && apt-get install -y ffmpeg
-```
-
-4. Expose port 8000
-
-## License
-
-MIT
-
+- Songs are stored locally in `songs/` directory
+- Database (`songs.db`) stores metadata and fingerprints
+- Temporary processing files are created in `temp/` and cleaned up automatically
+- Google Drive integration planned for Phase 2

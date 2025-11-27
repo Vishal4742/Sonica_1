@@ -5,54 +5,55 @@ pub mod storage;
 pub mod types;
 pub mod watcher;
 
+use crate::api::{create_router, AppState};
 use crate::error::{AppError, Result};
 use crate::storage::Database;
-use crate::types::SongFp;
-use crate::api::{AppState, create_router};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tracing::{info, error};
+use tokio::fs as tokio_fs;
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+    // Initialize tracing with better visibility
+    tracing_subscriber::fmt()
+        .with_target(false) // Don't show module paths
+        .with_thread_ids(false) // Don't show thread IDs
+        .with_file(false) // Don't show file names
+        .with_line_number(false) // Don't show line numbers
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "sonica_backend=info,tower_http=info".into()),
+        )
+        .with_ansi(true) // Enable colors
+        .init();
 
-    info!("Starting Sonica Backend...");
+    info!("Starting Sonica Backend (Shazam Engine)...");
 
     // Initialize database
     let db = Arc::new(Database::new("songs.db")?);
     info!("Database initialized");
 
     // Load existing songs and scan songs/ directory
-    info!("Loading existing songs...");
+    info!("Scanning songs...");
     load_and_process_songs(&db).await?;
-
-    // Initialize cache
-    let all_songs = db.get_all_fingerprints()?;
-    let cache = crate::types::CACHE.get_or_init(|| {
-        std::sync::RwLock::new(all_songs)
-    });
-    info!("Cache initialized with {} songs", cache.read().unwrap().len());
 
     // Start file watcher
     let db_watcher = Arc::clone(&db);
     let watch_handler: Arc<dyn Fn(String) + Send + Sync> = Arc::new(move |path: String| {
         let db = Arc::clone(&db_watcher);
-        let db = Arc::clone(&db_watcher);
         let path_clone = path.clone();
-        
+
         tokio::spawn(async move {
             info!("New file detected: {}", path_clone);
-            
+
             // Extract metadata from filename
             let filename = Path::new(&path_clone)
                 .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("Unknown");
-            
+
             let title = Path::new(filename)
                 .file_stem()
                 .and_then(|s| s.to_str())
@@ -83,23 +84,38 @@ async fn main() -> Result<()> {
         db: Arc::clone(&db),
     };
 
-    // Create router
-    let app = create_router(app_state);
+    // Create router with logging middleware
+    let cors = tower_http::cors::CorsLayer::permissive();
+    let trace_layer = tower_http::trace::TraceLayer::new_for_http()
+        .make_span_with(tower_http::trace::DefaultMakeSpan::new().level(tracing::Level::INFO))
+        .on_request(|_request: &axum::http::Request<_>, _span: &tracing::Span| {
+            tracing::info!("→ {} {}", _request.method(), _request.uri().path());
+        })
+        .on_response(|_response: &axum::http::Response<_>, latency: std::time::Duration, _span: &tracing::Span| {
+            tracing::info!("← {} {}ms", _response.status(), latency.as_millis());
+        });
+
+    let app = create_router(app_state)
+        .layer(cors)
+        .layer(trace_layer);
 
     // Start server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await
-        .map_err(|e| AppError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to bind to port 8000: {}", e),
-        )))?;
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+    let bind_addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
+        .await
+        .map_err(|e| {
+            AppError::Io(std::io::Error::other(format!(
+                "Failed to bind to {}: {}",
+                bind_addr, e
+            )))
+        })?;
 
-    info!("Server listening on http://0.0.0.0:8000");
-    
-    axum::serve(listener, app).await
-        .map_err(|e| AppError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Server error: {}", e),
-        )))?;
+    info!("Server listening on http://{}", bind_addr);
+
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| AppError::Io(std::io::Error::other(format!("Server error: {}", e))))?;
 
     Ok(())
 }
@@ -115,7 +131,7 @@ async fn load_and_process_songs(db: &Arc<Database>) -> Result<()> {
         return Ok(());
     }
 
-    let entries = fs::read_dir(songs_dir).await?;
+    let entries = tokio_fs::read_dir(songs_dir).await?;
     let mut paths = Vec::new();
 
     let mut entries = entries;
@@ -132,8 +148,10 @@ async fn load_and_process_songs(db: &Arc<Database>) -> Result<()> {
 
     // Process files in parallel
     use rayon::prelude::*;
-    
+
     let db_arc = Arc::clone(db);
+    let handle = tokio::runtime::Handle::current();
+
     let processed: Vec<_> = paths
         .par_iter()
         .filter_map(|path| {
@@ -147,7 +165,7 @@ async fn load_and_process_songs(db: &Arc<Database>) -> Result<()> {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("Unknown");
-            
+
             let title = Path::new(filename)
                 .file_stem()
                 .and_then(|s| s.to_str())
@@ -156,22 +174,15 @@ async fn load_and_process_songs(db: &Arc<Database>) -> Result<()> {
             let artist = "Unknown".to_string();
 
             // Process synchronously (we're in rayon thread)
-            match tokio::runtime::Handle::try_current() {
-                Ok(handle) => {
-                    let db_clone = Arc::clone(&db_arc);
-                    handle.block_on(process_song(&db_clone, path, &title, &artist))
-                        .map(|_| ())
-                        .map_err(|e| {
-                            error!("Error processing {}: {}", path, e);
-                            e
-                        })
-                        .ok()
-                }
-                Err(_) => {
-                    error!("No tokio runtime available for {}", path);
-                    None
-                }
-            }
+            let db_clone = Arc::clone(&db_arc);
+            handle
+                .block_on(process_song(&db_clone, path, &title, &artist))
+                .map(|_| ())
+                .map_err(|e| {
+                    error!("Error processing {}: {}", path, e);
+                    e
+                })
+                .ok()
         })
         .collect();
 
@@ -179,40 +190,21 @@ async fn load_and_process_songs(db: &Arc<Database>) -> Result<()> {
     Ok(())
 }
 
-async fn process_song(
-    db: &Arc<Database>,
-    path: &str,
-    title: &str,
-    artist: &str,
-) -> Result<()> {
+async fn process_song(db: &Arc<Database>, path: &str, title: &str, artist: &str) -> Result<()> {
     // Preprocess with FFmpeg
     let temp_output = format!("temp/{}_processed.wav", uuid::Uuid::new_v4());
-    
+
     fingerprint::preprocess_audio(path, &temp_output)?;
 
-    // Extract fingerprint
-    let fingerprint = fingerprint::extract_mfcc(&temp_output)?;
-    let normalized_fp = fingerprint::normalize_vector(&fingerprint);
+    // Decode and Fingerprint
+    let samples = fingerprint::decode_audio(&temp_output)?;
+    let fingerprints = fingerprint::generate_fingerprints(&samples);
 
     // Clean up temp file
     let _ = fs::remove_file(&temp_output);
 
     // Save to database
-    let song_id = db.insert_song(title, artist, path, &normalized_fp)?;
-
-    // Update cache
-    if let Some(cache) = crate::types::CACHE.get() {
-        let mut cache_guard = cache.write()
-            .map_err(|e| AppError::Fingerprint(format!("Cache lock error: {}", e)))?;
-        
-        cache_guard.push(SongFp {
-            id: song_id,
-            title: title.to_string(),
-            artist: artist.to_string(),
-            path: path.to_string(),
-            fingerprint: normalized_fp,
-        });
-    }
+    db.insert_song(title, artist, path, &fingerprints)?;
 
     Ok(())
 }

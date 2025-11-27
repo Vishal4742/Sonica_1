@@ -1,27 +1,35 @@
 use crate::error::{AppError, Result};
+use rustfft::{num_complex::Complex, FftPlanner};
 use std::path::Path;
 use std::process::Command;
-use symphonia::core::audio::AudioBuffer;
-use symphonia::core::codecs::DecoderOptions;
-use symphonia::core::formats::FormatOptions;
+use symphonia::core::audio::Signal;
 use symphonia::core::io::MediaSourceStream;
-use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::default::get_codecs;
 use symphonia::default::get_probe;
 
 const SAMPLE_RATE: u32 = 16000;
-const MFCC_COEFFS: usize = 13;
-const WINDOW_SIZE: usize = 512;
-const HOP_SIZE: usize = 256;
+const WINDOW_SIZE: usize = 4096; // Better frequency resolution
+const HOP_SIZE: usize = 2048; // 50% overlap
 
+/// Preprocess audio using FFmpeg (convert to 16kHz mono WAV)
 pub fn preprocess_audio(input_path: &str, output_path: &str) -> Result<()> {
-    let output = Command::new("ffmpeg")
-        .args(&[
-            "-i", input_path,
-            "-ar", "16000",
-            "-ac", "1",
-            "-f", "wav",
+    let ffmpeg_cmd = if cfg!(windows) {
+        "ffmpeg.exe"
+    } else {
+        "ffmpeg"
+    };
+
+    let output = Command::new(ffmpeg_cmd)
+        .args([
+            "-i",
+            input_path,
+            "-ar",
+            &SAMPLE_RATE.to_string(),
+            "-ac",
+            "1",
+            "-f",
+            "wav",
             "-y",
             output_path,
         ])
@@ -29,38 +37,28 @@ pub fn preprocess_audio(input_path: &str, output_path: &str) -> Result<()> {
         .map_err(|e| AppError::Ffmpeg(format!("Failed to execute FFmpeg: {}", e)))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(AppError::Ffmpeg(format!("FFmpeg failed: {}", stderr)));
+        return Err(AppError::Ffmpeg(format!(
+            "FFmpeg failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )));
     }
 
     Ok(())
 }
 
-pub fn extract_mfcc(audio_path: &str) -> Result<Vec<f32>> {
-    // Decode audio file
-    let audio_samples = decode_audio(audio_path)?;
-
-    // Compute MFCC features
-    let mfcc_features = compute_mfcc(&audio_samples)?;
-
-    Ok(mfcc_features)
-}
-
-fn decode_audio(path: &str) -> Result<Vec<f32>> {
+/// Decode audio file to float samples
+pub fn decode_audio(path: &str) -> Result<Vec<f32>> {
     let file = std::fs::File::open(path)?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
-    
+
     let mut hint = Hint::new();
     if let Some(ext) = Path::new(path).extension() {
         hint.with_extension(&ext.to_string_lossy());
     }
 
-    let meta_opts: MetadataOptions = Default::default();
-    let fmt_opts: FormatOptions = Default::default();
     let probe = get_probe();
-
     let mut probed = probe
-        .format(&hint, mss, &fmt_opts, &meta_opts)
+        .format(&hint, mss, &Default::default(), &Default::default())
         .map_err(|e| AppError::Audio(format!("Failed to probe audio: {}", e)))?;
 
     let track = probed
@@ -72,11 +70,8 @@ fn decode_audio(path: &str) -> Result<Vec<f32>> {
 
     let track_id = track.id;
     let codec_params = &track.codec_params;
-
-    let dec_opts: DecoderOptions = Default::default();
-    let codecs = get_codecs();
-    let mut decoder = codecs
-        .make(&codec_params, &dec_opts)
+    let mut decoder = get_codecs()
+        .make(codec_params, &Default::default())
         .map_err(|e| AppError::Audio(format!("Failed to create decoder: {}", e)))?;
 
     let mut samples = Vec::new();
@@ -98,23 +93,22 @@ fn decode_audio(path: &str) -> Result<Vec<f32>> {
 
         match decoder.decode(&packet) {
             Ok(decoded) => {
-                let spec = *decoded.spec();
-                let duration = decoded.capacity() as u64;
-
-                // Convert to f32 samples
-                let mut buffer = AudioBuffer::<f32>::new(duration, spec);
-                buffer.convert(decoded);
-
-                for sample in buffer.planes().planes()[0].iter() {
-                    samples.push(*sample);
+                use symphonia::core::audio::AudioBufferRef;
+                match decoded {
+                    AudioBufferRef::F32(buf) => samples.extend(buf.chan(0).iter().cloned()),
+                    AudioBufferRef::U8(buf) => {
+                        samples.extend(buf.chan(0).iter().map(|&s| s as f32 / 128.0 - 1.0))
+                    }
+                    AudioBufferRef::S16(buf) => {
+                        samples.extend(buf.chan(0).iter().map(|&s| s as f32 / 32768.0))
+                    }
+                    _ => continue, // Handle other formats if needed
                 }
             }
-            Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
-            Err(e) => return Err(AppError::Audio(format!("Decode error: {}", e))),
+            Err(_) => continue,
         }
     }
 
-    // Resample to 16kHz if needed
     if samples.is_empty() {
         return Err(AppError::Audio("No audio samples decoded".to_string()));
     }
@@ -122,139 +116,132 @@ fn decode_audio(path: &str) -> Result<Vec<f32>> {
     Ok(samples)
 }
 
-fn compute_mfcc(samples: &[f32]) -> Result<Vec<f32>> {
-    // Simple spectral feature extraction (simplified MFCC-like features)
-    // For MVP: compute average spectral energy across frequency bands
-    
-    let num_windows = (samples.len() as f32 / HOP_SIZE as f32).ceil() as usize;
-    let mut features = Vec::with_capacity(MFCC_COEFFS);
+/// Generate spectrogram (STFT)
+fn spectrogram(samples: &[f32]) -> Vec<Vec<f32>> {
+    let mut planner = FftPlanner::new();
+    let fft = planner.plan_fft_forward(WINDOW_SIZE);
 
-    for i in 0..num_windows {
-        let start = i * HOP_SIZE;
-        let end = (start + WINDOW_SIZE).min(samples.len());
-        
-        if end <= start {
-            break;
-        }
+    let num_frames = (samples.len() - WINDOW_SIZE) / HOP_SIZE;
+    let mut spectrogram = Vec::with_capacity(num_frames);
 
-        let window = &samples[start..end];
-        
-        // Apply window function (Hamming)
-        let windowed: Vec<f32> = window
-            .iter()
-            .enumerate()
-            .map(|(i, &s)| {
-                let hamming = 0.54 - 0.46 * (2.0 * std::f32::consts::PI * i as f32 / (WINDOW_SIZE - 1) as f32).cos();
-                s * hamming
-            })
-            .collect();
-
-        // Compute power spectrum (simplified FFT)
-        let fft_size = WINDOW_SIZE;
-        let mut power = vec![0.0f32; fft_size / 2];
-        
-        for k in 0..fft_size / 2 {
-            let mut real = 0.0;
-            let mut imag = 0.0;
-            
-            for n in 0..windowed.len() {
-                let angle = -2.0 * std::f32::consts::PI * k as f32 * n as f32 / fft_size as f32;
-                real += windowed[n] * angle.cos();
-                imag += windowed[n] * angle.sin();
-            }
-            
-            power[k] = real * real + imag * imag;
-        }
-
-        // Group into MFCC_COEFFS bands (mel-scale approximation)
-        let mut mfcc_frame = vec![0.0f32; MFCC_COEFFS];
-        let bands_per_coeff = (power.len() / MFCC_COEFFS).max(1);
-        
-        for (i, mfcc) in mfcc_frame.iter_mut().enumerate() {
-            let band_start = i * bands_per_coeff;
-            let band_end = ((i + 1) * bands_per_coeff).min(power.len());
-            
-            let energy: f32 = power[band_start..band_end].iter().sum();
-            *mfcc = energy.ln().max(0.0);
-        }
-
-        features.extend(mfcc_frame);
-    }
-
-    // Average across all frames to get a single feature vector
-    if features.is_empty() {
-        return Err(AppError::Fingerprint("No features extracted".to_string()));
-    }
-
-    let mut avg_features = vec![0.0f32; MFCC_COEFFS];
-    let num_frames = features.len() / MFCC_COEFFS;
-    
-    for i in 0..MFCC_COEFFS {
-        let sum: f32 = (0..num_frames)
-            .map(|f| features[f * MFCC_COEFFS + i])
-            .sum();
-        avg_features[i] = sum / num_frames as f32;
-    }
-
-    Ok(avg_features)
-}
-
-pub fn normalize_vector(v: &[f32]) -> Vec<f32> {
-    let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm > 0.0 {
-        v.iter().map(|x| x / norm).collect()
-    } else {
-        v.to_vec()
-    }
-}
-
-pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    if a.len() != b.len() {
-        return 0.0;
-    }
-
-    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
-    if norm_a > 0.0 && norm_b > 0.0 {
-        dot / (norm_a * norm_b)
-    } else {
-        0.0
-    }
-}
-
-pub fn find_best_match(
-    query_fp: &[f32],
-    cache: &[crate::types::SongFp],
-) -> Option<(crate::types::MatchResult, usize)> {
-    use rayon::prelude::*;
-
-    let similarities: Vec<(f32, usize)> = cache
-        .par_iter()
-        .enumerate()
-        .map(|(idx, song)| {
-            let similarity = cosine_similarity(query_fp, &song.fingerprint);
-            (similarity, idx)
+    // Hanning window
+    let window: Vec<f32> = (0..WINDOW_SIZE)
+        .map(|i| {
+            0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (WINDOW_SIZE - 1) as f32).cos())
         })
         .collect();
 
-    let (best_score, best_idx) = similarities
-        .into_iter()
-        .max_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))?;
+    for i in 0..num_frames {
+        let start = i * HOP_SIZE;
+        let end = start + WINDOW_SIZE;
+        let chunk = &samples[start..end];
 
-    if best_score > 0.7 {
-        // Threshold for match
-        let song = &cache[best_idx];
-        Some((
-            crate::types::MatchResult {
-                title: song.title.clone(),
-                artist: song.artist.clone(),
-                score: best_score,
-            },
-            best_idx,
-        ))
-    } else {
-        None
+        let mut buffer: Vec<Complex<f32>> = chunk
+            .iter()
+            .zip(&window)
+            .map(|(&s, &w)| Complex::new(s * w, 0.0))
+            .collect();
+
+        fft.process(&mut buffer);
+
+        // Keep magnitude of first half (Nyquist)
+        let magnitude: Vec<f32> = buffer[0..WINDOW_SIZE / 2]
+            .iter()
+            .map(|c| c.norm())
+            .collect();
+
+        spectrogram.push(magnitude);
     }
+
+    spectrogram
+}
+
+/// Find peaks in spectrogram (Constellation Map)
+fn find_peaks(spectrogram: &[Vec<f32>]) -> Vec<(usize, usize)> {
+    let rows = spectrogram.len();
+    let cols = spectrogram[0].len();
+    let mut peaks = Vec::new();
+
+    // Divide into frequency bands to ensure peaks across spectrum
+    // e.g., Low, Mid, High
+    let bands = [(0, 50), (50, 200), (200, 500), (500, cols)];
+
+    for (start_bin, end_bin) in bands {
+        for t in 0..rows {
+            let mut max_val = 0.0;
+            let mut max_freq = 0;
+
+            // Find max in this band for this time frame
+            for f in start_bin..end_bin.min(cols) {
+                if spectrogram[t][f] > max_val {
+                    max_val = spectrogram[t][f];
+                    max_freq = f;
+                }
+            }
+
+            // Simple local maximum check (time axis)
+            // Check if it's a peak compared to neighbors
+            if max_val > 1.0 {
+                // Noise threshold
+                let mut is_peak = true;
+                // Check +/- 2 frames
+                for dt in 1..=2 {
+                    if t >= dt && spectrogram[t - dt][max_freq] > max_val {
+                        is_peak = false;
+                        break;
+                    }
+                    if t + dt < rows && spectrogram[t + dt][max_freq] > max_val {
+                        is_peak = false;
+                        break;
+                    }
+                }
+
+                if is_peak {
+                    peaks.push((t, max_freq));
+                }
+            }
+        }
+    }
+
+    peaks
+}
+
+/// Generate hashes from peaks (Combinatorial Hashing)
+/// Returns: (hash, time_offset)
+pub fn generate_fingerprints(samples: &[f32]) -> Vec<(u32, u32)> {
+    let spec = spectrogram(samples);
+    let peaks = find_peaks(&spec);
+    let mut fingerprints = Vec::new();
+
+    // Target zone: look ahead in time
+    let target_zone_start = 5; // frames ahead
+    let target_zone_end = 50; // frames ahead
+
+    for i in 0..peaks.len() {
+        let (t1, f1) = peaks[i];
+
+        for j in (i + 1)..peaks.len() {
+            let (t2, f2) = peaks[j];
+            let dt = t2 - t1;
+
+            if dt < target_zone_start {
+                continue;
+            }
+            if dt > target_zone_end {
+                break;
+            } // Peaks are sorted by time usually
+
+            // Hash: [f1: 9 bits] [f2: 9 bits] [dt: 14 bits]
+            // f1, f2 are bin indices. WINDOW=4096, bins=2048.
+            // We care mostly about lower 512 bins (0-2kHz) where music energy is.
+            // Let's mask to 9 bits (511).
+
+            if f1 < 512 && f2 < 512 {
+                let hash = ((f1 as u32) << 23) | ((f2 as u32) << 14) | (dt as u32);
+                fingerprints.push((hash, t1 as u32));
+            }
+        }
+    }
+
+    fingerprints
 }

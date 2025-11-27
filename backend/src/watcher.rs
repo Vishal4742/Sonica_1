@@ -5,26 +5,25 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 pub struct FileWatcher {
+    #[allow(dead_code)]
     watcher: RecommendedWatcher,
     event_rx: mpsc::Receiver<notify::Result<Event>>,
 }
 
 impl FileWatcher {
-    pub fn new(watch_path: &str, event_tx: mpsc::Sender<notify::Result<Event>>) -> Result<Self> {
+    pub fn new(watch_path: &str, _event_tx: mpsc::Sender<notify::Result<Event>>) -> Result<Self> {
         let (tx, rx) = mpsc::channel(100);
         
-        let watcher = notify::recommended_watcher(move |res| {
+        let mut watcher = notify::recommended_watcher(move |res| {
             let _ = tx.try_send(res);
         })
-        .map_err(|e| AppError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        .map_err(|e| AppError::Io(std::io::Error::other(
             format!("Failed to create watcher: {}", e),
         )))?;
 
         watcher
             .watch(Path::new(watch_path), RecursiveMode::NonRecursive)
-            .map_err(|e| AppError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            .map_err(|e| AppError::Io(std::io::Error::other(
                 format!("Failed to watch path: {}", e),
             )))?;
 
@@ -77,18 +76,16 @@ pub async fn start_watcher(
 ) -> Result<()> {
     let (tx, mut rx) = mpsc::channel(100);
     
-    let watcher = notify::recommended_watcher(move |res| {
+    let mut watcher = notify::recommended_watcher(move |res| {
         let _ = tx.try_send(res);
     })
-    .map_err(|e| AppError::Io(std::io::Error::new(
-        std::io::ErrorKind::Other,
+    .map_err(|e| AppError::Io(std::io::Error::other(
         format!("Failed to create watcher: {}", e),
     )))?;
 
     watcher
         .watch(Path::new(watch_path), RecursiveMode::NonRecursive)
-        .map_err(|e| AppError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        .map_err(|e| AppError::Io(std::io::Error::other(
             format!("Failed to watch path: {}", e),
         )))?;
 
