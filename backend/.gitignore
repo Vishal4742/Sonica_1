@@ -4,3 +4,5 @@ temp/
 target/
 Cargo.lock
 *.log
+temp.mp3
+
