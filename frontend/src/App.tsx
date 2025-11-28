@@ -1,49 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Marquee } from './components/Marquee';
 import { ListenButton } from './components/ListenButton';
 import { ResultCard } from './components/ResultCard';
 import { AudioSourceToggle } from './components/AudioSourceToggle';
 import { useAudioRecorder, AudioSource } from './hooks/useAudioRecorder';
-import { recognizeAudio, SongMatch } from './services/api';
+import { useWebSocketAudio } from './hooks/useWebSocketAudio';
+import { SongMatch } from './services/api';
 
 function App() {
-    const { isRecording, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
+    const { isRecording, startContinuousRecording, stopRecording, error: recorderError } = useAudioRecorder();
+    const { isConnected, connect, disconnect, sendChunk, lastMatch, error: wsError } = useWebSocketAudio();
+
     const [audioSource, setAudioSource] = useState<AudioSource>('microphone');
     const [match, setMatch] = useState<SongMatch | null>(null);
-    const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [status, setStatus] = useState<string>('');
+
+    // 1. Persistent Connection: Connect on mount
+    useEffect(() => {
+        connect();
+        return () => {
+            disconnect();
+        };
+    }, [connect, disconnect]);
+
+    // Handle matching
+    useEffect(() => {
+        if (lastMatch) {
+            setMatch(lastMatch);
+            setStatus('Match found!');
+            stopRecording();
+            // Do NOT disconnect here, keep the socket open
+        }
+    }, [lastMatch, stopRecording]);
+
+    // Handle errors
+    useEffect(() => {
+        if (recorderError) setError(recorderError);
+        if (wsError) setError(wsError);
+    }, [recorderError, wsError]);
 
     const handleToggleListening = async () => {
         if (isRecording) {
-            // Stop recording and process
-            setIsProcessing(true);
-            const audioBlob = await stopRecording();
+            stopRecording();
+            setStatus('');
+            return;
+        }
 
-            if (audioBlob) {
-                try {
-                    const result = await recognizeAudio(audioBlob);
-                    if (result.match) {
-                        setMatch(result.match);
-                        setError(null);
-                    } else {
-                        setError('No match found. Try again.');
-                        setMatch(null);
-                    }
-                } catch (err) {
-                    setError('Connection error. Is the backend running?');
-                    console.error(err);
-                } finally {
-                    setIsProcessing(false);
-                }
-            } else {
-                setIsProcessing(false);
-            }
-        } else {
-            // Start recording
-            setMatch(null);
-            setError(null);
-            await startRecording(audioSource);
+        if (!isConnected) {
+            setError('Connecting to server...');
+            // Try to reconnect if not connected?
+            connect();
+            return;
+        }
+
+        setError(null);
+        setMatch(null);
+        setStatus('Listening...');
+
+        try {
+            // Start Continuous Recording
+            await startContinuousRecording(audioSource, (blob) => {
+                sendChunk(blob);
+            }, 3000); // Send chunk every 3 seconds
+
+        } catch (err) {
+            console.error(err);
+            setError('Failed to start listening');
+            setStatus('');
         }
     };
 
@@ -73,25 +98,22 @@ function App() {
                     <AudioSourceToggle
                         audioSource={audioSource}
                         onToggle={setAudioSource}
-                        disabled={isRecording || isProcessing}
+                        disabled={isRecording}
                     />
                 </div>
 
                 <ListenButton
-                    isListening={isRecording || isProcessing}
+                    isListening={isRecording}
                     onClick={handleToggleListening}
                 />
 
                 {/* Status Text */}
                 <div className="mt-8 h-8">
-                    {isProcessing && (
-                        <p className="text-xl font-bold uppercase animate-pulse">Processing Audio...</p>
+                    {status && (
+                        <p className="text-xl font-bold uppercase animate-pulse">{status}</p>
                     )}
                     {error && (
                         <p className="text-xl font-bold uppercase text-red-600 bg-white border border-black px-2">{error}</p>
-                    )}
-                    {recorderError && (
-                        <p className="text-xl font-bold uppercase text-red-600 bg-white border border-black px-2">{recorderError}</p>
                     )}
                 </div>
 

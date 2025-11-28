@@ -34,6 +34,9 @@ pub enum AppError {
 
     #[error("External API error: {0}")]
     External(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 impl IntoResponse for AppError {
@@ -48,6 +51,7 @@ impl IntoResponse for AppError {
             AppError::NotFound(e) => (StatusCode::NOT_FOUND, e),
             AppError::InvalidRequest(e) => (StatusCode::BAD_REQUEST, e),
             AppError::External(e) => (StatusCode::BAD_GATEWAY, e),
+            AppError::Internal(e) => (StatusCode::INTERNAL_SERVER_ERROR, e),
         };
 
         let body = Json(json!({

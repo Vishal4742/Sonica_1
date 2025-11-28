@@ -121,6 +121,10 @@ fn spectrogram(samples: &[f32]) -> Vec<Vec<f32>> {
     let mut planner = FftPlanner::new();
     let fft = planner.plan_fft_forward(WINDOW_SIZE);
 
+    if samples.len() < WINDOW_SIZE {
+        return Vec::new();
+    }
+
     let num_frames = (samples.len() - WINDOW_SIZE) / HOP_SIZE;
     let mut spectrogram = Vec::with_capacity(num_frames);
 
@@ -159,6 +163,9 @@ fn spectrogram(samples: &[f32]) -> Vec<Vec<f32>> {
 /// Find peaks in spectrogram (Constellation Map)
 fn find_peaks(spectrogram: &[Vec<f32>]) -> Vec<(usize, usize)> {
     let rows = spectrogram.len();
+    if rows == 0 {
+        return Vec::new();
+    }
     let cols = spectrogram[0].len();
     let mut peaks = Vec::new();
 
@@ -210,7 +217,10 @@ fn find_peaks(spectrogram: &[Vec<f32>]) -> Vec<(usize, usize)> {
 /// Returns: (hash, time_offset)
 pub fn generate_fingerprints(samples: &[f32]) -> Vec<(u32, u32)> {
     let spec = spectrogram(samples);
-    let peaks = find_peaks(&spec);
+    let mut peaks = find_peaks(&spec);
+    // Sort peaks by time (t) to ensure t2 > t1 in the loop
+    peaks.sort_by_key(|k| k.0);
+
     let mut fingerprints = Vec::new();
 
     // Target zone: look ahead in time

@@ -3,8 +3,11 @@ use crate::fingerprint::{generate_fingerprints, preprocess_audio};
 use crate::storage::Database;
 use crate::types::{MatchResult, RecognitionResponse, SongMetadata};
 use axum::{
-    extract::{Multipart, State},
-    response::Json,
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Multipart, State,
+    },
+    response::{IntoResponse, Json},
     routing::{get, post},
     Router,
 };
@@ -14,6 +17,8 @@ use std::sync::Arc;
 use tokio::fs;
 use tracing::{info, warn};
 use uuid::Uuid;
+
+const MATCH_THRESHOLD: i64 = 8;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -26,7 +31,158 @@ pub fn create_router(state: AppState) -> Router {
         .route("/songs", get(list_songs))
         .route("/recognize", post(recognize))
         .route("/upload", post(upload))
+        .route("/ws", get(ws_handler))
         .with_state(state)
+}
+
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(|socket| handle_socket(socket, state))
+}
+
+async fn handle_socket(mut socket: WebSocket, state: AppState) {
+    info!("New WebSocket connection");
+
+    while let Some(msg) = socket.recv().await {
+        let msg = match msg {
+            Ok(msg) => msg,
+            Err(e) => {
+                warn!("WebSocket error: {}", e);
+                return;
+            }
+        };
+
+        match msg {
+            Message::Binary(data) => {
+                info!("Received binary data size: {} bytes", data.len());
+                // Security: Max message size check (e.g., 1MB)
+                if data.len() > 1_000_000 {
+                    warn!("Message too large, closing connection");
+                    return;
+                }
+
+                let state_clone = state.clone();
+
+                let task_result =
+                    tokio::task::spawn_blocking(move || -> Result<Option<MatchResult>> {
+                        // 1. Save to temp
+                        let temp_id = Uuid::new_v4();
+                        let temp_path =
+                            std::env::temp_dir().join(format!("upload_{}.wav", temp_id));
+                        std::fs::write(&temp_path, &data)
+                            .map_err(|e| AppError::Internal(e.to_string()))?;
+
+                        // 2. Preprocess
+                        let processed_path =
+                            std::env::temp_dir().join(format!("processed_{}.wav", temp_id));
+
+                        if let Err(e) = preprocess_audio(
+                            temp_path.to_str().unwrap(),
+                            processed_path.to_str().unwrap(),
+                        ) {
+                            warn!("FFmpeg error: {}", e);
+                            let _ = std::fs::remove_file(&temp_path);
+                            return Err(e);
+                        }
+
+                        // Now decode the processed file
+                        let samples = match crate::fingerprint::decode_audio(
+                            processed_path.to_str().unwrap(),
+                        ) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                warn!("Decode error: {}", e);
+                                let _ = std::fs::remove_file(&temp_path);
+                                let _ = std::fs::remove_file(&processed_path);
+                                return Err(e);
+                            }
+                        };
+
+                        let _ = std::fs::remove_file(temp_path);
+                        let _ = std::fs::remove_file(processed_path);
+
+                        // 3. Fingerprint
+                        let fingerprints = generate_fingerprints(&samples);
+                        info!("Generated {} fingerprints", fingerprints.len());
+
+                        if fingerprints.is_empty() {
+                            return Ok(None);
+                        }
+
+                        // 4. Match
+                        let matches = state_clone.db.find_matches(&fingerprints)?;
+
+                        // Histogram logic
+                        let mut best_song_id = -1;
+                        let mut best_score = 0;
+
+                        for (song_id, offsets) in matches {
+                            let mut histogram = HashMap::new();
+                            let mut max_count = 0;
+                            for (db_offset, query_offset) in offsets {
+                                let relative_offset = (db_offset as i64) - (query_offset as i64);
+                                let count = histogram.entry(relative_offset).or_insert(0);
+                                *count += 1;
+                                if *count > max_count {
+                                    max_count = *count;
+                                }
+                            }
+                            if max_count > best_score {
+                                best_score = max_count;
+                                best_song_id = song_id;
+                            }
+                        }
+
+                        info!("Best score: {}", best_score);
+
+                        if best_score > MATCH_THRESHOLD {
+                            if let Some(metadata) =
+                                state_clone.db.get_song_metadata(best_song_id)?
+                            {
+                                let scale_factor = 15.0;
+                                let normalized_score =
+                                    1.0 - (-(best_score as f32) / scale_factor).exp();
+                                let clamped_score = normalized_score.min(1.0).max(0.0);
+
+                                return Ok(Some(MatchResult {
+                                    title: metadata.title,
+                                    artist: metadata.artist,
+                                    score: clamped_score,
+                                }));
+                            }
+                        }
+
+                        Ok(None)
+                    })
+                    .await;
+
+                match task_result {
+                    Ok(Ok(Some(match_result))) => {
+                        info!(
+                            "Match found: {} - {}",
+                            match_result.artist, match_result.title
+                        );
+                        // Found a match! Send it back
+                        let response = serde_json::json!({
+                            "type": "match",
+                            "match": match_result
+                        });
+                        if let Err(e) = socket.send(Message::Text(response.to_string())).await {
+                            warn!("Failed to send match: {}", e);
+                            break;
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        warn!("Processing error: {}", e);
+                    }
+                    _ => {} // No match or task error
+                }
+            }
+            Message::Close(_) => {
+                return;
+            }
+            _ => {}
+        }
+    }
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -122,27 +278,30 @@ async fn recognize(
 
     // Threshold for a match
     // Need at least X matching points aligned in time
-    let threshold = 10; // Tunable parameter
-
-    if best_score > threshold {
+    if best_score > MATCH_THRESHOLD {
         if let Some(metadata) = state.db.get_song_metadata(best_song_id)? {
             // Normalize score to 0-1 range (frontend will multiply by 100 for percentage)
             // The score is the count of matching fingerprint points aligned in time
             // Use a logarithmic scale to map to 0-1 range more naturally
             // Formula: normalized = 1 - exp(-score / scale_factor)
             // This ensures scores are always between 0 and 1
-            
+
             // Scale factor: higher values = slower growth toward 1.0
             // For score of 25, we want ~0.85, so: 1 - exp(-25/15) ≈ 0.81
             // For score of 40, we want ~0.95, so: 1 - exp(-40/15) ≈ 0.93
             let scale_factor = 15.0;
             let normalized_score = 1.0 - (-(best_score as f32) / scale_factor).exp();
-            
+
             // Clamp to ensure it's always between 0 and 1
             let clamped_score = normalized_score.min(1.0).max(0.0);
-            
-            info!("Match found: {} - {} (raw score: {}, confidence: {:.1}%)", 
-                  metadata.title, metadata.artist, best_score, clamped_score * 100.0);
+
+            info!(
+                "Match found: {} - {} (raw score: {}, confidence: {:.1}%)",
+                metadata.title,
+                metadata.artist,
+                best_score,
+                clamped_score * 100.0
+            );
             return Ok(Json(RecognitionResponse {
                 r#match: Some(MatchResult {
                     title: metadata.title,
@@ -153,7 +312,10 @@ async fn recognize(
         }
     }
 
-    warn!("No match found (best score: {}, threshold: {})", best_score, threshold);
+    warn!(
+        "No match found (best score: {}, threshold: {})",
+        best_score, MATCH_THRESHOLD
+    );
     Ok(Json(RecognitionResponse { r#match: None }))
 }
 

@@ -49,18 +49,8 @@ async fn main() -> Result<()> {
         tokio::spawn(async move {
             info!("New file detected: {}", path_clone);
 
-            // Extract metadata from filename
-            let filename = Path::new(&path_clone)
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Unknown");
-
-            let title = Path::new(filename)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Unknown")
-                .to_string();
-            let artist = "Unknown".to_string();
+            // Extract metadata
+            let (title, artist) = extract_metadata(Path::new(&path_clone));
 
             // Check if already processed
             if db.song_exists_by_path(&path_clone).unwrap_or(false) {
@@ -163,18 +153,8 @@ async fn load_and_process_songs(db: &Arc<Database>) -> Result<()> {
                 return None;
             }
 
-            // Extract metadata from filename
-            let filename = Path::new(path)
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Unknown");
-
-            let title = Path::new(filename)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Unknown")
-                .to_string();
-            let artist = "Unknown".to_string();
+            // Extract metadata
+            let (title, artist) = extract_metadata(Path::new(path));
 
             // Process synchronously (we're in rayon thread)
             let db_clone = Arc::clone(&db_arc);
@@ -210,6 +190,43 @@ async fn process_song(db: &Arc<Database>, path: &str, title: &str, artist: &str)
     db.insert_song(title, artist, path, &fingerprints)?;
 
     Ok(())
+}
+
+fn extract_metadata(path: &Path) -> (String, String) {
+    use lofty::{prelude::*, read_from_path};
+
+    let mut title = String::from("Unknown");
+    let mut artist = String::from("Unknown");
+
+    // Try to read tags
+    if let Ok(tagged_file) = read_from_path(path) {
+        if let Some(tag) = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag())
+        {
+            if let Some(t) = tag.title() {
+                if !t.trim().is_empty() {
+                    title = t.to_string();
+                }
+            }
+            if let Some(a) = tag.artist() {
+                if !a.trim().is_empty() {
+                    artist = a.to_string();
+                }
+            }
+        }
+    }
+
+    // Fallback to filename if title is still unknown
+    if title == "Unknown" {
+        title = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Unknown")
+            .to_string();
+    }
+
+    (title, artist)
 }
 
 fn is_audio_file(path: &Path) -> bool {
