@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["ffmpeg", "openssl", "pkg-config"]
-
-[phases.build]
-cmds = ["cargo build --release"]
-
-[start]
-cmd = "./target/release/sonica-backend"
