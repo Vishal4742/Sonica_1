@@ -1,0 +1,7 @@
+target/
+songs/
+temp/
+.git
+.env
+temp.mp3
+
