@@ -33,7 +33,8 @@ async fn main() -> Result<()> {
 
     // Initialize database
     let db = Arc::new(Database::new("songs.db")?);
-    info!("Database initialized");
+    let song_count = db.get_all_songs()?.len();
+    info!("Database initialized with {} songs", song_count);
 
     // Load existing songs and scan songs/ directory
     info!("Scanning songs...");
@@ -91,13 +92,15 @@ async fn main() -> Result<()> {
         .on_request(|_request: &axum::http::Request<_>, _span: &tracing::Span| {
             tracing::info!("→ {} {}", _request.method(), _request.uri().path());
         })
-        .on_response(|_response: &axum::http::Response<_>, latency: std::time::Duration, _span: &tracing::Span| {
-            tracing::info!("← {} {}ms", _response.status(), latency.as_millis());
-        });
+        .on_response(
+            |_response: &axum::http::Response<_>,
+             latency: std::time::Duration,
+             _span: &tracing::Span| {
+                tracing::info!("← {} {}ms", _response.status(), latency.as_millis());
+            },
+        );
 
-    let app = create_router(app_state)
-        .layer(cors)
-        .layer(trace_layer);
+    let app = create_router(app_state).layer(cors).layer(trace_layer);
 
     // Start server
     let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
