@@ -4,61 +4,66 @@
 
 <br>
 
-**ON**
+On
 
 <br>
 
-# **SONICA: High-Performance Music Recognition System**
+# **Sonica: High Performance Music Recognition System**
 
 <br>
 
-*Submitted in partial fulfillment of the requirements for the award of the degree of*
+Submitted in Partial fulfilment for the Award of the degree of
 
 **Bachelor of Technology**
 
-*in*
+In
 
 **Artificial Intelligence and Machine Learning**
 
-<br>
-<br>
+Submitted to
 
-**Submitted to**
+**RAJIV GANDHI PROUDYOGIKI VISHWAVIDHYALAYA, BHOPAL (M.P)**
 
-**RAJIV GANDHI PROUDYOGIKI VISHWAVIDHYALAYA, BHOPAL (M.P.)**
-
-<br>
-<br>
-
-**Submitted by**
-
-| Name | Enrollment No. |
-| :--- | :--- |
-| **Vishal Kumar** | **0126AL231142** |
-| **Navin Kumar** | **0126AL231087** |
-| **Khushi Kumari** | **0126AL231075** |
-| **Prabhat Raushan** | **0126AL231095** |
+Rajiv Gandhi Proudyogiki Vishwavidyalaya, Bhopal | RGPV 2018 Latest Updates - www.sample-papers.com
 
 <br>
+
+Submitted by
+
+**Vishal Kumar** (0126AL231142)
+
+**Navin Kumar** (0126AL231087)
+
+**Khushi Kumari** (0126AL231075)
+
+**Prabhat Raushan** (0126AL231095)
+
 <br>
 
-**Under the Guidance of**
+Under the guidance of
 
 **Ms. Neelima Pandey**
-*Assistant Professor*
+
+(Assistant Professor)
 
 <br>
 <br>
 
 <img src="https://upload.wikimedia.org/wikipedia/en/thumb/4/4c/Oriental_College_of_Technology_logo.png/220px-Oriental_College_of_Technology_logo.png" alt="OCT Logo" width="100" height="100">
 
-**DEPARTMENT OF ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING**
 **ORIENTAL COLLEGE OF TECHNOLOGY, BHOPAL**
 
-*Approved by AICTE, New Delhi & Govt. of M.P.*
-*Affiliated to Rajiv Gandhi Proudyogiki Vishwavidyalaya, Bhopal*
+**Department of Artificial Intelligence and Machine Learning**
 
-**(July - December 2024)**
+Approved by AICTE New Delhi & Govt. of MP
+Affiliated to Rajiv Gandhi Proudyogiki Vishwavidyalaya, Bhopal
+
+**July Dec 2025**
+
+Phone No.-0755-2529015, 2529016
+Fax: 0755-2529472
+E-mail: directoroct@oriental.ac.in
+Website: http://www.oriental.ac.in/oct-bhopal/
 
 </div>
 
@@ -68,31 +73,26 @@
 
 **ORIENTAL COLLEGE OF TECHNOLOGY, BHOPAL**
 
-*Approved by AICTE, New Delhi & Govt. of M.P. | Affiliated to RGPV, Bhopal*
-*Oriental Campus, Raisen Road, Bhopal-462021 (MP) INDIA*
+Approved by AICTE, New Delhi & Govt. of M.P. Affiliated to Rajiv Gandhi ProudyogikiVishwavidyalaya, Bhopal
+Oriental Campus, Raisen Road, Bhopal-462021 (MP) INDIA
 
 ----------------------------------------------------------------------------------------------------------------
 
-**DEPARTMENT OF ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING**
+**DEPARTMENT OF AIML**
 
-<br>
 <br>
 
 **CANDIDATE’S DECLARATION**
 
 </div>
 
-<br>
-
-We hereby declare that the Minor Project I report entitled “**Sonica: High-Performance Music Recognition System**” which is being submitted in partial fulfillment of the requirement for the award of the degree of **Bachelor of Technology** in **Artificial Intelligence and Machine Learning**, is a record of authentic work carried out by us at the **Department of Artificial Intelligence and Machine Learning, Oriental College of Technology, Bhopal**.
-
-The matter embodied in this report has not been submitted to any other University or Institute for the award of any degree or diploma. Use of any other person's work or ideas has been properly cited and acknowledged.
+I hereby declare that the Minor I report on “**Sonica: High-Performance Music Recognition System**” which is being presented here for the partial fulfillment of the requirement of Degree of “**Bachelor of Technology**” has been carried out at **Department of Artificial Intelligence and Machine Learning**, Oriental College of Technology Bhopal. The technical information provided in this report is presented with due permission of the authorities from the training organization.
 
 <br>
 <br>
 <br>
 
-**(Signature of Students)**
+**Signature of Student**
 
 <br>
 
@@ -104,36 +104,26 @@ The matter embodied in this report has not been submitted to any other Universit
 <br>
 **Prabhat Raushan** (0126AL231095)
 
-<br>
-<br>
-
-**Date:** ..............................
-**Place:** Bhopal
-
 <div style="page-break-after: always;"></div>
 
 <div align="center">
 
 **ORIENTAL COLLEGE OF TECHNOLOGY, BHOPAL**
 
-*Approved by AICTE, New Delhi & Govt. of M.P. | Affiliated to RGPV, Bhopal*
+Approved by AICTE, New Delhi & Govt. of M.P. Affiliated to Rajiv Gandhi ProudyogikiVishwavidyalaya, Bhopal
+Oriental Campus, Raisen Road, Bhopal-462021 (MP) INDIA
 
 ----------------------------------------------------------------------------------------------------------------
 
-**DEPARTMENT OF ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING**
+**DEPARTMENT OF AIML**
 
 <br>
-<br>
 
-**INSTITUTE CERTIFICATE**
+**CERTIFICATE OF INSTITUTE**
 
 </div>
 
-<br>
-
-This is to certify that the project report entitled “**Sonica**”, submitted by **Mr. Vishal Kumar**, **Mr. Navin Kumar**, **Ms. Khushi Kumari**, and **Mr. Prabhat Raushan** (Enrollment Nos. **0126AL231142**, **0126AL231087**, **0126AL231075**, **0126AL231095**) in partial fulfillment of the requirements for the award of the degree of **Bachelor of Technology** in **Artificial Intelligence and Machine Learning**, is a bona fide record of the work carried out by them under my supervision and guidance.
-
-To the best of my knowledge, the matter embodied in this report has not been submitted to any other University or Institute for the award of any degree or diploma.
+This is to certify that **Mr. Vishal Kumar**, **Mr. Navin Kumar**, **Ms. Khushi Kumari**, and **Mr. Prabhat Raushan** of **B. Tech. AIML Department** Enrollment No. **0126AL231142**, **0126AL231087**, **0126AL231075**, **0126AL231095** has successfully completed there Minor Project I during the academic year 2025-2026 as partial fulfillment of the Bachelor of Technology in AIML.
 
 <br>
 <br>
@@ -141,8 +131,7 @@ To the best of my knowledge, the matter embodied in this report has not been sub
 <br>
 
 **Ms. Neelima Pandey**                                                                 **Dr. Rajesh Nigam**
-*(Project Guide)*                                                                               *(Head of Department)*
-Assistant Professor                                                                           Department of AI & ML
+Project Guide                                                             HOD (Assistant Professor Department of AIML)
 
 <div style="page-break-after: always;"></div>
 
@@ -158,109 +147,36 @@ First and foremost, we express our deepest sense of gratitude to our project gui
 
 We are extremely grateful to **Dr. Rajesh Nigam**, Head of the Department, Artificial Intelligence and Machine Learning, for providing us with the necessary academic environment and infrastructural facilities to carry out our work. His vision and dedication to academic excellence have been a source of inspiration.
 
-We also thank the **Director, Oriental College of Technology**, and the management for their support. A special thanks goes to the technical staff of the computer labs for their assistance with hardware and software resources.
-
-Last but not least, we thank our parents and friends for their unwavering moral support, patience, and understanding during the long hours of work.
+We also thank the Director **Dr. K. K. Dwivedi**, Oriental College of Technology, and the management for their support. A special thanks goes to the technical staff of the computer labs for their assistance with hardware and software resources.
 
 <br>
 <br>
-<br>
 
-**Team Sonica**
-*   Vishal Kumar
-*   Navin Kumar
-*   Khushi Kumari
-*   Prabhat Raushan
+**Vishal Kumar** (0126AL231142)
 
-<div style="page-break-after: always;"></div>
+**Navin Kumar** (0126AL231087)
 
-<div align="center">
+**Khushi Kumari** (0126AL231075)
 
-# **ABSTRACT**
-
-</div>
-
-In the contemporary digital landscape, Audio Information Retrieval (AIR) has become a pivotal technology, enabling systems to index and identify vast libraries of audio content. **Sonica** is a high-performance, open-source Audio Fingerprinting system designed to identify music tracks from short, noisy samples recorded via a microphone. This project replicates and optimizes the industrial-strength algorithm initially proposed by Avery Wang (Shazam), leveraging the **Rust** programming language for the backend to achieve near-real-time performance and memory safety.
-
-The system operates by converting time-domain audio signals into the frequency domain using the **Short-Time Fourier Transform (STFT)**. From the resulting spectrogram, "constellation points" (local energy maxima) are extracted and combinatorially hashed to create unique, noise-resistant fingerprints. These fingerprints are indexed in a relational database, allowing for O(1) retrieval times. A "Histogram of Offsets" technique is employed to temporally align query hashes with database tracks, ensuring precise identification even in the presence of significant background noise or distortion.
-
-The frontend is built using **React.js**, providing a modern, responsive user interface for audio capture and result visualization. Experimental results demonstrate that Sonica achieves an identification accuracy of over **95%** for high-quality inputs and **85%** for noisy environments, with an average retrieval latency of under **500 milliseconds**. This project not only serves as a robust proof-of-concept for AIR technologies but also showcases the efficacy of Rust in systems programming tasks traditionally dominated by C++.
-
-<div style="page-break-after: always;"></div>
-
-<div align="center">
-
-# **TABLE OF CONTENTS**
-
-</div>
-
-| Chapter | Title | Page No. |
-| :--- | :--- | :--- |
-| | **List of Figures** | vii |
-| | **List of Tables** | viii |
-| | **List of Abbreviations** | ix |
-| **1** | **INTRODUCTION** | **1** |
-| 1.1 | Background and Motivation | 1 |
-| 1.2 | Problem Statement | 2 |
-| 1.3 | Objectives of the Project | 2 |
-| 1.4 | Scope and Limitations | 3 |
-| 1.5 | Report Organization | 3 |
-| **2** | **LITERATURE REVIEW** | **4** |
-| 2.1 | Evolution of Audio Fingerprinting | 4 |
-| 2.2 | Comparative Analysis of Existing Algorithms | 5 |
-| 2.3 | Technology Stack Justification | 6 |
-| **3** | **SYSTEM ANALYSIS AND REQUIREMENTS** | **7** |
-| 3.1 | Feasibility Study | 7 |
-| 3.2 | Software Requirement Specification (SRS) | 8 |
-| 3.3 | Functional Requirements | 9 |
-| 3.4 | Non-Functional Requirements | 9 |
-| **4** | **METHODOLOGY AND ALGORITHMS** | **11** |
-| 4.1 | Mathematical Modeling | 11 |
-| 4.2 | Signal Preprocessing Pipeline | 12 |
-| 4.3 | Spectrogram Generation (STFT) | 13 |
-| 4.4 | Combinatorial Hashing Strategy | 14 |
-| 4.5 | Matching Algorithm (Histogram of Offsets) | 16 |
-| **5** | **SYSTEM DESIGN AND ARCHITECTURE** | **18** |
-| 5.1 | High-Level Architecture | 18 |
-| 5.2 | Data Flow Diagrams (DFD) | 19 |
-| 5.3 | Database Design (ER Diagram) | 21 |
-| 5.4 | Data Dictionary | 22 |
-| **6** | **IMPLEMENTATION DETAILS** | **23** |
-| 6.1 | Backend Implementation (Rust) | 23 |
-| 6.2 | Frontend Implementation (React) | 25 |
-| 6.3 | Key Modules and Functions | 26 |
-| **7** | **RESULTS AND DISCUSSION** | **28** |
-| 7.1 | Testing Methodology | 28 |
-| 7.2 | Performance Analysis | 29 |
-| 7.3 | Comparative Evaluation | 30 |
-| **8** | **CONCLUSION AND FUTURE SCOPE** | **31** |
-| 8.1 | Conclusion | 31 |
-| 8.2 | Future Enhancements | 31 |
-| | **REFERENCES** | **33** |
-| | **APPENDICES** | **34** |
+**Prabhat Raushan** (0126AL231095)
 
 <div style="page-break-after: always;"></div>
 
 # List of Figures
 
-| Figure No. | Caption | Page No. |
+| Figure No. | Caption / Title | Page No. |
 | :--- | :--- | :--- |
-| 4.1 | Time Domain vs. Frequency Domain Representation | 11 |
-| 4.2 | Spectrogram Visualization of an Audio Clip | 13 |
-| 4.3 | Identification of Anchor Points and Target Zones | 15 |
-| 5.1 | High-Level System Architecture | 18 |
+| 4.1 | Spectrogram Visualization | 13 |
+| 5.1 | System Architecture DFD (Vertical Level 0) | 19 |
 | 5.2 | Level 0 DFD (Context Diagram) | 19 |
 | 5.3 | Level 1 DFD (Process Decomposition) | 20 |
 | 5.4 | Entity Relationship Diagram (ERD) | 21 |
-| 6.1 | UseAudioRecorder Custom Hook Logic | 25 |
-| 7.1 | Response Time vs. Database Size | 29 |
-| 7.2 | Accuracy vs. Signal-to-Noise Ratio (SNR) | 30 |
 
 <br>
 
 # List of Tables
 
-| Table No. | Caption | Page No. |
+| Table No. | Caption / Title | Page No. |
 | :--- | :--- | :--- |
 | 2.1 | Comparison of Audio Fingerprinting Technologies | 5 |
 | 3.1 | Hardware Interface Requirements | 8 |
@@ -271,21 +187,92 @@ The frontend is built using **React.js**, providing a modern, responsive user in
 
 <br>
 
-# List of Abbreviations
+# List of Symbols & Abbreviations
 
-| Abbreviation | Full Form |
+| Symbol | Description |
 | :--- | :--- |
-| **AIR** | Audio Information Retrieval |
-| **API** | Application Programming Interface |
-| **DFT** | Discrete Fourier Transform |
-| **FFT** | Fast Fourier Transform |
-| **STFT** | Short-Time Fourier Transform |
-| **PCM** | Pulse-Code Modulation |
-| **JSON** | JavaScript Object Notation |
-| **SQL** | Structured Query Language |
-| **UI/UX** | User Interface / User Experience |
-| **SNR** | Signal-to-Noise Ratio |
-| **WAV** | Waveform Audio File Format |
+| A | Ampere |
+| ARM | Association Rule Mining |
+| DIC | Dynamic Item-Set Counting |
+| DM | Data Mining |
+| DHP | Direct Hashing and Pruning |
+| DFT | Discrete Fourier Transform |
+| FFT | Fast Fourier Transform |
+| STFT | Short-Time Fourier Transform |
+| DFD | Data Flow Diagram |
+| ER | Entity Relationship |
+
+<div style="page-break-after: always;"></div>
+
+<div align="center">
+
+# **Executive Summary**
+
+</div>
+
+**Sonica** is a high-performance, open-source music recognition system engineered to identify songs in real-time with high accuracy. Inspired by the industrial-strength algorithm popularized by Shazam, this project implements a complex audio fingerprinting mechanism from scratch.
+
+The project is built upon a dual-stack architecture:
+1.  **Backend (Rust)**: Leveraging the memory safety and zero-cost abstractions of the Rust programming language, the backend handles computationally intensive tasks such as signal demodulation, Fast Fourier Transforms (FFT), and high-speed database queries.
+2.  **Frontend (React)**: A modern, responsive web interface built with React.js and Vite, providing users with an intuitive "Listen" and "Upload" experience.
+
+The core core technical innovation lies in the **Combinatorial Hashing** of spectrogram peaks. By converting time-domain audio signals into the frequency domain using **STFT (Short-Time Fourier Transform)**, the system creates a "Constellation Map" of high-energy points. These points are paired to form unique hashes that are robust against noise, distortion, and linear time compression.
+
+In our testing, Sonica achieves a recognition speed of under **500ms** for indexed songs and maintains **85%+ accuracy** in varied noise environments. This project illustrates the practical application of Signal Processing and Systems Programming within the broad domain of Artificial Intelligence.
+
+<div style="page-break-after: always;"></div>
+
+<div align="center">
+
+# **TABLE OF CONTENTS**
+
+</div>
+
+| Section | Title |
+| :--- | :--- |
+| **Front Page** | **ii** |
+| **Candidate’s Declaration** | **iii** |
+| **Certificate of Institute** | **iv** |
+| **Acknowledgement** | **v** |
+| **List of Figures** | **vi** |
+| **List of Tables** | **vii** |
+| **List of Symbols & Abbreviations** | **viii** |
+| **Executive Summary** | **ix** |
+| **1** | **INTRODUCTION** |
+| 1.1 | Background and Motivation |
+| 1.2 | Problem Statement |
+| 1.3 | Objectives of the Project |
+| 1.4 | Scope and Limitations |
+| 1.5 | Report Organization |
+| **2** | **LITERATURE REVIEW** |
+| 2.1 | Evolution of Audio Fingerprinting |
+| 2.2 | Comparative Analysis of Existing Algorithms |
+| 2.3 | Technology Stack Justification |
+| **3** | **SOFTWARE REQUIREMENT SPECIFICATION** |
+| 3.1 | Feasibility Study |
+| 3.2 | Software Requirement Specification (SRS) |
+| 3.3 | Functional Requirements |
+| 3.4 | Non-Functional Requirements |
+| **4** | **PROBLEM FORMULATION AND PROPOSED METHODOLOGY** |
+| 4.1 | Mathematical Modeling |
+| 4.2 | Signal Preprocessing Pipeline |
+| 4.3 | Spectrogram Generation (STFT) |
+| 4.4 | Combinatorial Hashing Strategy |
+| 4.5 | Matching Algorithm (Histogram of Offsets) |
+| **5** | **SYSTEM DOCUMENTATION** |
+| 5.1 | DFD |
+| 5.2 | System Flow Chart |
+| 5.3 | ER Diagram |
+| 5.4 | Data Dictionary |
+| **6** | **RESULTS AND DISCUSSION** |
+| 6.1 | Testing Methodology |
+| 6.2 | Performance Analysis |
+| 6.3 | Comparative Evaluation |
+| **7** | **CONCLUSION AND FUTURE SCOPE** |
+| 7.1 | Conclusion |
+| 7.2 | Future Enhancements |
+| **8** | **REFERENCES** |
+| **9** | **APPENDICES** |
 
 <div style="page-break-after: always;"></div>
 
@@ -366,7 +353,7 @@ Audio fingerprinting has evolved significantly since the late 1990s.
 
 <div style="page-break-after: always;"></div>
 
-# CHAPTER 3: SYSTEM ANALYSIS AND REQUIREMENTS
+# CHAPTER 3: SOFTWARE REQUIREMENT SPECIFICATION
 
 ## 3.1 Feasibility Study
 *   **Technical Feasibility**: The algorithm requires standard FFT operations, which are well-supported in Rust (`rustfft` crate). Modern laptops have sufficient CPU power to compute this in real-time.
@@ -394,7 +381,7 @@ The target users are general consumers wishing to identify music. No technical e
 
 <div style="page-break-after: always;"></div>
 
-# CHAPTER 4: METHODOLOGY AND ALGORITHMS
+# CHAPTER 4: PROBLEM FORMULATION AND PROPOSED METHODOLOGY
 
 ## 4.1 Mathematical Modeling
 The transformation of audio from a continuous time signal to a discrete digital fingerprint involves several mathematical stages.
@@ -441,15 +428,9 @@ If the song matches, the histogram of these offsets will show a significant spik
 
 <div style="page-break-after: always;"></div>
 
-# CHAPTER 5: SYSTEM DESIGN AND ARCHITECTURE
+# CHAPTER 5: SYSTEM DOCUMENTATION
 
-## 5.1 High-Level Architecture
-The system follows a typical Client-Server architecture.
-*   **Client**: React SPA (Single Page Application).
-*   **Server**: Axum (Rust Framework).
-*   **Data Store**: SQLite (Embedded).
-
-## 5.2 Data Flow Diagrams (DFD)
+## 5.1 DFD (Data Flow Diagram)
 
 ### Level 0 DFD (Vertical Layout)
 
@@ -468,7 +449,32 @@ graph TD
     Frontend -- "Display Info" --> User
 ```
 
-## 5.3 Database Design (ER Diagram)
+## 5.2 System Flow Chart
+
+1.  **Initialization**:
+    *   Load `songs.db`.
+    *   Start HTTP Server (Axum) on Port 8000.
+    *   Start React Dev Server on Port 5173.
+2.  **User Interaction**:
+    *   User presses "Mic" button.
+    *   `MediaRecorder` API captures stream.
+3.  **Processing**:
+    *   Stop recording after 5 seconds.
+    *   POST `/recognize` with `FormData`.
+4.  **Backend Logic**:
+    *   `ffmpeg` converts input to temporary `.wav`.
+    *   `rustfft` computes the spectrum.
+    *   `fingerprinter.rs` generates hashes.
+    *   `storage.rs` performs SQL query: `SELECT * FROM fingerprints WHERE hash IN (...)`.
+5.  **Scoring**:
+    *   Group results by `song_id`.
+    *   Calculate offsets.
+    *   Find the bin with max count.
+6.  **Response**:
+    *   If `MaxCount > Threshold`, return `Success`.
+    *   Else, return `null`.
+
+## 5.3 ER Diagram
 
 ```mermaid
 erDiagram
@@ -506,41 +512,9 @@ erDiagram
 
 <div style="page-break-after: always;"></div>
 
-# CHAPTER 6: IMPLEMENTATION DETAILS
+# CHAPTER 6: RESULTS AND DISCUSSION
 
-## 6.1 Backend Implementation (Rust)
-The backend is structured as a workspace with modular design.
-
-### Core Modules:
-1.  **`main.rs`**: Entry point. Sets up the Axum router and database connection pool.
-2.  **`fingerprint.rs`**: implementation of the signal processing pipeline. Uses `buteo` or custom logic for STFT.
-3.  **`storage.rs`**: Handles all SQL interactions.
-
-**Key Code Snippet: Search Logic**
-```rust
-// Calculate scores based on offset histogram
-let mut best_score = 0;
-let mut best_song_id = None;
-
-for (song_id, offsets) in matches {
-    let mode_count = calculate_mode(offsets);
-    if mode_count > best_score {
-        best_score = mode_count;
-        best_song_id = Some(song_id);
-    }
-}
-```
-
-## 6.2 Frontend Implementation (React)
-The frontend uses **React Hooks** to manage state.
-*   **`useAudioRecorder`**: A custom hook that wraps the browser's `MediaRecorder` API. It handles permission requests, data chunking, and blob creation.
-*   **TailwindCSS**: Used for styling to ensure a professional, dark-themed aesthetic.
-
-<div style="page-break-after: always;"></div>
-
-# CHAPTER 7: RESULTS AND DISCUSSION
-
-## 7.1 Testing Methodology
+## 6.1 Testing Methodology
 We conducted "Black Box Testing" where various audio samples (clean, noisy, chopped) were fed into the system without knowledge of the internal state.
 
 ### Table 7.1: Test Cases
@@ -551,24 +525,24 @@ We conducted "Black Box Testing" where various audio samples (clean, noisy, chop
 | **TC-03** | 5s Mic Recording (Noisy Room) | Match Found | Match Found | **PASS** |
 | **TC-04** | Non-indexed song | No Match | No Match | **PASS** |
 
-## 7.2 Performance Analysis
+## 6.2 Performance Analysis
 *   **Indexing Speed**: ~30 seconds to index 100 songs on an Intel i5.
 *   **Retrieval Speed**: < 200ms for database lookup.
 *   **Storage Efficiency**: The fingerprint database occupies approx. 10% of the size of the raw MP3s.
 
-## 7.3 Comparative Evaluation
+## 6.3 Comparative Evaluation
 Compared to Python implementations (e.g., Dejavu), **Sonica** (Rust) shows:
 *   **5x Faster** fingerprint generation.
 *   **10x Lower** memory usage due to lack of Garbage Collection overhead.
 
 <div style="page-break-after: always;"></div>
 
-# CHAPTER 8: CONCLUSION AND FUTURE SCOPE
+# CHAPTER 7: CONCLUSION AND FUTURE SCOPE
 
-## 8.1 Conclusion
+## 7.1 Conclusion
 **Sonica** successfully demonstrates the power of modern systems programming in the domain of Digital Signal Processing. The project met all primary objectives, delivering a robust, accurate, and high-performance music recognition service. The use of **Combinatorial Hashing** proved to be the decisive factor in achieving noise resilience.
 
-## 8.2 Future Enhancements
+## 7.2 Future Enhancements
 1.  **Distributed Architecture**: Implement sharding for the database to support billions of fingerprints.
 2.  **Live Stream Identification**: Adapt the system to monitor radio streams continuously.
 3.  **Humming Recognition**: Modify the "Peak Detection" to track "Pitch Contours" for query-by-humming support.
@@ -616,5 +590,4 @@ Compared to Python implementations (e.g., Dejavu), **Sonica** (Rust) shows:
 <br>
 <br>
 
----
-*End of Report*
+Note: Submit code and project report in a CD along with report
