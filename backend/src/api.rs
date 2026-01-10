@@ -19,6 +19,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 const MATCH_THRESHOLD: i64 = 8;
+const MAX_UPLOAD_SIZE: usize = 10_000_000; // 10MB limit for uploads
 
 #[derive(Clone)]
 pub struct AppState {
@@ -221,8 +222,15 @@ async fn recognize(
     let audio_data =
         audio_data.ok_or_else(|| AppError::InvalidRequest("No audio file provided".to_string()))?;
 
+    // Security: Validate file size
     if audio_data.len() < 1000 {
         return Err(AppError::InvalidRequest("Audio file too small".to_string()));
+    }
+    if audio_data.len() > MAX_UPLOAD_SIZE {
+        return Err(AppError::InvalidRequest(format!(
+            "Audio file too large. Maximum size is {} bytes",
+            MAX_UPLOAD_SIZE
+        )));
     }
 
     // Save to temp file
@@ -366,8 +374,22 @@ async fn upload(
     let filename =
         filename.ok_or_else(|| AppError::InvalidRequest("No filename provided".to_string()))?;
 
+    // Security: Validate file size
+    if audio_data.len() > MAX_UPLOAD_SIZE {
+        return Err(AppError::InvalidRequest(format!(
+            "Audio file too large. Maximum size is {} bytes",
+            MAX_UPLOAD_SIZE
+        )));
+    }
+
+    // Security: Sanitize filename to prevent path traversal attacks
+    let safe_filename = Path::new(&filename)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .ok_or_else(|| AppError::InvalidRequest("Invalid filename".to_string()))?;
+
     let title = title.unwrap_or_else(|| {
-        Path::new(&filename)
+        Path::new(safe_filename)
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("Unknown")
@@ -375,8 +397,8 @@ async fn upload(
     });
     let artist = artist.unwrap_or_else(|| "Unknown".to_string());
 
-    // Save to songs directory
-    let song_path = format!("songs/{}", filename);
+    // Save to songs directory with sanitized filename
+    let song_path = format!("songs/{}", safe_filename);
     fs::write(&song_path, &audio_data).await?;
 
     // Check if already exists

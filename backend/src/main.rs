@@ -88,6 +88,10 @@ async fn main() -> Result<()> {
         ])
         .allow_methods(tower_http::cors::Any)
         .allow_headers(tower_http::cors::Any);
+
+    // Configure Concurrency Limit (max 50 concurrent requests - basic DoS protection)
+    let concurrency_limit = tower::limit::ConcurrencyLimitLayer::new(50);
+
     let trace_layer = tower_http::trace::TraceLayer::new_for_http()
         .make_span_with(tower_http::trace::DefaultMakeSpan::new().level(tracing::Level::INFO))
         .on_request(|_request: &axum::http::Request<_>, _span: &tracing::Span| {
@@ -101,7 +105,10 @@ async fn main() -> Result<()> {
             },
         );
 
-    let app = create_router(app_state).layer(cors).layer(trace_layer);
+    let app = create_router(app_state)
+        .layer(cors)
+        .layer(concurrency_limit)
+        .layer(trace_layer);
 
     // Start server
     let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
