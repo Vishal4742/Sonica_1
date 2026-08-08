@@ -10,11 +10,25 @@ Sonica is an open-source, high-performance music recognition system inspired by 
 ## ✨ Features
 
 -   **Real-time Recognition**: Identifies songs from microphone input or system audio in seconds.
--   **Advanced Fingerprinting**: Uses STFT (Short-Time Fourier Transform) and peak detection to create unique audio signatures.
+-   **Advanced Fingerprinting**: STFT spectrogram, adaptive per-band peak detection, and combinatorial peak-pair hashing (32-bit) with a bounded fan-out that keeps the fingerprint database compact.
 -   **Robust Matching**: Implements a "Histogram of Offsets" algorithm for high-accuracy matching, even with background noise.
 -   **Metadata Extraction**: Automatically extracts Title and Artist information from audio files using ID3 tags (via `lofty`).
 -   **WebSocket Streaming**: Low-latency audio streaming from client to server.
--   **Modern UI**: Beautiful, dark-themed interface with real-time visualizations using Framer Motion and TailwindCSS.
+-   **Modern UI**: Dark-themed interface with smooth animations using Framer Motion and TailwindCSS.
+
+## 📊 Performance
+
+Measured on a 50-song reference database (commodity laptop, release build):
+
+| Metric | Value |
+| --- | --- |
+| Recognition latency | ~75 ms server-side for a 5-second clip |
+| Indexing | ~8 s to fingerprint 50 songs (parallel, via Rayon) |
+| Fingerprint database | ~0.4 MB per song (~20 MB for 50 songs) |
+| Idle memory | ~9 MB |
+| Accuracy | correct on every clean-clip test; non-indexed audio is rejected |
+
+Numbers come from the actual build — rebuild the database with `reindex` and re-run to reproduce them.
 
 ## 🛠️ Tech Stack
 
@@ -37,6 +51,7 @@ Sonica is an open-source, high-performance music recognition system inspired by 
 ### Prerequisites
 -   [Rust & Cargo](https://www.rust-lang.org/tools/install)
 -   [Node.js & npm](https://nodejs.org/)
+-   [FFmpeg](https://ffmpeg.org/download.html) — must be on your `PATH`; the backend shells out to it to decode and resample audio
 -   [Git LFS](https://git-lfs.github.com/) (Required for large audio files)
 
 ### 1. Clone the Repository
