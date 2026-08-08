@@ -28,6 +28,9 @@ pub fn preprocess_audio(input_path: &str, output_path: &str) -> Result<()> {
             &SAMPLE_RATE.to_string(),
             "-ac",
             "1",
+            // High-pass filter: remove DC offset and sub-100 Hz rumble that create spurious peaks
+            "-af",
+            "highpass=f=100",
             "-f",
             "wav",
             "-y",
@@ -174,25 +177,33 @@ fn find_peaks(spectrogram: &[Vec<f32>]) -> Vec<(usize, usize)> {
     let bands = [(0, 50), (50, 200), (200, 500), (500, cols)];
 
     for (start_bin, end_bin) in bands {
+        let end = end_bin.min(cols);
+        if start_bin >= end {
+            continue;
+        }
         for t in 0..rows {
             let mut max_val = 0.0;
-            let mut max_freq = 0;
+            let mut max_freq = start_bin;
+            let mut sum = 0.0f32;
 
-            // Find max in this band for this time frame
-            for f in start_bin..end_bin.min(cols) {
-                if spectrogram[t][f] > max_val {
-                    max_val = spectrogram[t][f];
+            // Find max (and mean) in this band for this time frame
+            for f in start_bin..end {
+                let v = spectrogram[t][f];
+                sum += v;
+                if v > max_val {
+                    max_val = v;
                     max_freq = f;
                 }
             }
+            let mean = sum / (end - start_bin) as f32;
 
-            // Simple local maximum check (time axis)
-            // Check if it's a peak compared to neighbors
-            if max_val > 1.0 {
-                // Noise threshold
+            // Adaptive threshold: a peak must stand at least 2x above the band's
+            // mean energy (plus an absolute noise floor). This keeps only strong,
+            // distinctive peaks and cuts fingerprint density.
+            if max_val > 1.0 && max_val > 2.0 * mean {
+                // Local-maximum check along the time axis, +/- 3 frames
                 let mut is_peak = true;
-                // Check +/- 2 frames
-                for dt in 1..=2 {
+                for dt in 1..=3 {
                     if t >= dt && spectrogram[t - dt][max_freq] > max_val {
                         is_peak = false;
                         break;
@@ -226,9 +237,11 @@ pub fn generate_fingerprints(samples: &[f32]) -> Vec<(u32, u32)> {
     // Target zone: look ahead in time
     let target_zone_start = 5; // frames ahead
     let target_zone_end = 50; // frames ahead
+    const FAN_OUT: usize = 5; // max target peaks paired per anchor (bounds density)
 
     for i in 0..peaks.len() {
         let (t1, f1) = peaks[i];
+        let mut paired = 0usize;
 
         for j in (i + 1)..peaks.len() {
             let (t2, f2) = peaks[j];
@@ -249,6 +262,12 @@ pub fn generate_fingerprints(samples: &[f32]) -> Vec<(u32, u32)> {
             if f1 < 512 && f2 < 512 {
                 let hash = ((f1 as u32) << 23) | ((f2 as u32) << 14) | (dt as u32);
                 fingerprints.push((hash, t1 as u32));
+                paired += 1;
+                // Cap fan-out: each anchor pairs with at most FAN_OUT nearest targets.
+                // This is the primary control on fingerprint density and DB size.
+                if paired >= FAN_OUT {
+                    break;
+                }
             }
         }
     }

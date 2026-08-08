@@ -18,7 +18,7 @@ use tokio::fs;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-const MATCH_THRESHOLD: i64 = 8;
+const MATCH_THRESHOLD: i64 = 5;
 const MAX_UPLOAD_SIZE: usize = 10_000_000; // 10MB limit for uploads
 
 #[derive(Clone)]
@@ -139,7 +139,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                             if let Some(metadata) =
                                 state_clone.db.get_song_metadata(best_song_id)?
                             {
-                                let scale_factor = 15.0;
+                                let scale_factor = 5.0;
                                 let normalized_score =
                                     1.0 - (-(best_score as f32) / scale_factor).exp();
                                 let clamped_score = normalized_score.min(1.0).max(0.0);
@@ -297,7 +297,7 @@ async fn recognize(
             // Scale factor: higher values = slower growth toward 1.0
             // For score of 25, we want ~0.85, so: 1 - exp(-25/15) ≈ 0.81
             // For score of 40, we want ~0.95, so: 1 - exp(-40/15) ≈ 0.93
-            let scale_factor = 15.0;
+            let scale_factor = 5.0;
             let normalized_score = 1.0 - (-(best_score as f32) / scale_factor).exp();
 
             // Clamp to ensure it's always between 0 and 1
