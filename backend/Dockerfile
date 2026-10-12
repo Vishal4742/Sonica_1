@@ -1,18 +1,20 @@
 # Build Stage
-FROM rust:1.81-slim-bookworm as builder
+FROM rust:1.92-slim-bookworm AS builder
 WORKDIR /app
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
 COPY . .
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # Runtime Stage
 FROM debian:bookworm-slim
-WORKDIR /app
-# Install FFmpeg and OpenSSL (Required for Sonica)
-RUN apt-get update && apt-get install -y ffmpeg openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/sonica-backend .
-COPY --from=builder /app/songs.db .
+# Hugging Face runs the container as uid 1000. The server writes songs/, temp/
+# and SQLite's -wal/-shm files next to itself, so that user must own the folder.
+RUN useradd -m -u 1000 user
+USER user
+WORKDIR /home/user/app
+COPY --from=builder --chown=user /app/target/release/sonica-backend ./
+COPY --chown=user songs.db ./
 
 # Expose the port (Hugging Face uses 7860 by default)
 ENV PORT=7860
