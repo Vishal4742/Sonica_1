@@ -1,3 +1,89 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Crate digging: approved design J (design/sonica-J-crate.html). Plain CSS because the
+   3D crate is transforms and keyframes rather than layout utilities. */
+:root {
+    --ground: #0F3B2E; --hair: rgba(243,234,215,.24); --raised: rgba(243,234,215,.14);
+    --ink: #F3EAD7; --muted: rgba(243,234,215,.74); --accent: #F2B544; --on-accent: #1B1405; --seg-bg: rgba(12,47,37,.7);
+    --display: 'Instrument Serif', Georgia, serif; --body: 'Instrument Sans', system-ui, sans-serif; --mono: 'Geist Mono', ui-monospace, Menlo, monospace;
+    --ease: cubic-bezier(.22, 1, .36, 1); --pad: 72px;
+}
+html, body { height: 100%; }
+html { overflow: hidden; } /* the pulled-out vinyl may poke past the edge on phones */
+body { background: radial-gradient(120% 90% at 30% 100%, #14503F 0%, #0F3B2E 55%, #0A2C22 100%); background-color: var(--ground); color: var(--ink); font-family: var(--body); -webkit-font-smoothing: antialiased; overflow: hidden; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.skip { position: fixed; left: 16px; top: -48px; z-index: 10; background: var(--ink); color: var(--ground); padding: 8px 12px; border-radius: 8px; }
+.skip:focus { top: 16px; }
+
+.top { position: fixed; inset: 0 0 auto 0; z-index: 4; display: flex; align-items: center; justify-content: space-between; padding: 24px var(--pad); }
+.brand { color: var(--ink); text-decoration: none; font-family: var(--display); font-size: 22px; letter-spacing: -0.02em; }
+.linkish { color: var(--muted); text-decoration: none; font-size: 14px; transition: color .3s var(--ease); }
+.linkish:hover { color: var(--ink); }
+
+.block > * { animation: rise .6s var(--ease) both; }
+.block > *:nth-child(2) { animation-delay: .06s; }
+.block > *:nth-child(3) { animation-delay: .12s; }
+.block > *:nth-child(4) { animation-delay: .18s; }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; text-wrap: balance; }
+h1 em, h2 em { font-family: var(--display); font-style: italic; letter-spacing: -0.01em; color: var(--accent); }
+h1 { font-size: clamp(54px, 6vw, 96px); line-height: .92; letter-spacing: -0.025em; margin-bottom: 22px; }
+h2 { font-size: clamp(44px, 4.6vw, 72px); line-height: .95; letter-spacing: -0.02em; margin-bottom: 18px; }
+.lede { font-size: 18px; line-height: 28px; color: var(--muted); max-width: 520px; margin: 0 0 32px; text-wrap: pretty; overflow-wrap: anywhere; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 24px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 16px/1 var(--body); cursor: pointer; transition: transform .3s var(--ease), filter .3s var(--ease); }
+.btn:hover { filter: brightness(1.08); }
+.btn:active { transform: translateY(1px) scale(.98); }
+.btn[disabled] { opacity: .55; cursor: progress; filter: none; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
+.btn svg, .seg svg { width: 18px; height: 18px; flex: none; }
+.seg { display: inline-flex; padding: 4px; border-radius: 999px; background: var(--seg-bg); box-shadow: inset 0 0 0 1px var(--hair); }
+.seg button { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 999px; color: var(--muted); font: 500 14px/1 var(--body); cursor: pointer; transition: background .3s var(--ease), color .3s var(--ease); }
+.seg button[aria-checked="true"] { background: var(--raised); color: var(--ink); }
+.hint { font: 400 12px/16px var(--mono); color: var(--muted); margin-top: 18px; }
+
+.status { position: fixed; z-index: 3; left: 6vw; top: 96px; display: flex; flex-direction: column; gap: 8px; font: 400 13px/20px var(--mono); font-variant-numeric: tabular-nums; }
+.bar { display: block; width: 160px; height: 2px; background: var(--hair); }
+.bar i { display: block; height: 100%; background: var(--accent); }
+
+.shop { position: fixed; inset: 0; perspective: 1100px; perspective-origin: 36% 30%; overflow: hidden; touch-action: none; cursor: grab; }
+.shop:active { cursor: grabbing; }
+.crate { position: absolute; left: 6vw; bottom: -2vh; width: min(46vw, 560px); height: min(46vw, 560px); transform-style: preserve-3d; transform: rotateX(16deg); }
+.crate .box { position: absolute; left: -26px; right: -26px; bottom: 0; height: 58%; border-radius: 6px 6px 0 0; transform: translateZ(40px); box-shadow: inset 0 3px 0 rgba(255,220,170,.25), 0 -6px 40px rgba(0,0,0,.35);
+    background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 3px, transparent 3px 22px), linear-gradient(#8A5A32, #6E4425); }
+.crate .box::after { content: ''; position: absolute; left: 50%; top: 18%; width: 22%; height: 12%; transform: translateX(-50%); border-radius: 999px; background: #3B2414; box-shadow: inset 0 3px 6px rgba(0,0,0,.6); }
+.sleeve { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; transform-origin: 50% 100%; border-radius: 3px; background-size: cover; background-position: center;
+    box-shadow: 0 -2px 0 rgba(255,255,255,.08) inset, 0 10px 30px rgba(0,0,0,.45); backface-visibility: hidden; will-change: transform; }
+.sleeve::after { content: ''; position: absolute; inset: 0; border-radius: 3px; background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.25)); }
+
+/* .pick and .disc move with Framer Motion (src/components/Crate.tsx) */
+.pick { position: absolute; left: calc(6vw + min(23vw, 280px)); bottom: 36vh; width: min(30vw, 360px, 46vh); aspect-ratio: 1; pointer-events: none; }
+.pick .disc { position: absolute; inset: 4%; border-radius: 50%; background: repeating-radial-gradient(circle, #121212 0 2px, #1C1C1C 2px 4px); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.pick .disc::after { content: ''; position: absolute; inset: 36%; border-radius: 50%; background: radial-gradient(circle, #1B1405 0 6%, #F2B544 7% 100%); }
+.pick .back { position: absolute; inset: 0; border-radius: 3px; background: #F6EEDC; color: #1B1405; padding: 9% 9% 8%; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    background-image: radial-gradient(rgba(0,0,0,.04) 1px, transparent 1px); background-size: 6px 6px; }
+.pick .back small { font: 500 11px/16px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #6A5A3C; }
+.pick .back .t { font: 400 clamp(26px, 2.6vw, 42px)/1.02 var(--display); letter-spacing: -0.02em; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.pick .back .t.l { font-size: clamp(20px, 1.8vw, 28px); }
+.pick .back .a { font: 500 15px/20px var(--body); margin-top: 8px; }
+.pick .back .m { font: 400 12px/18px var(--mono); color: #6A5A3C; display: flex; justify-content: space-between; }
+
+.side { position: fixed; z-index: 3; top: 0; right: 0; bottom: 0; width: min(520px, 40vw); padding: 120px var(--pad) 48px 0; display: flex; flex-direction: column; justify-content: center; }
+
+@media (max-width: 720px) {
+    :root { --pad: 20px; }
+    .top { padding: 20px var(--pad); }
+    .lede { font-size: 16px; line-height: 24px; margin-bottom: 24px; }
+    .hint { display: none; }
+    .crate { left: 50%; width: 64vw; height: 64vw; transform: translateX(-50%) rotateX(16deg); bottom: 40vh; }
+    .side { top: auto; left: 0; width: auto; padding: 0 var(--pad) 22px; background: linear-gradient(transparent, #0A2C22 30%); }
+    h1 { font-size: 44px; } h2 { font-size: 36px; }
+    .pick { left: 50%; bottom: 48vh; width: 56vw; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .block > * { animation: fade .3s linear both; }
+}

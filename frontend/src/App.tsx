@@ -1,137 +1,175 @@
-import { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { Marquee } from './components/Marquee';
-import { ListenButton } from './components/ListenButton';
-import { ResultCard } from './components/ResultCard';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioSourceToggle } from './components/AudioSourceToggle';
-import { useAudioRecorder, AudioSource } from './hooks/useAudioRecorder';
+import { Crate, View } from './components/Crate';
+import { MotionConfig } from 'framer-motion';
+import { Mic, RotateCcw, Square } from 'lucide-react';
+import { AudioSource, useAudioRecorder } from './hooks/useAudioRecorder';
 import { useWebSocketAudio } from './hooks/useWebSocketAudio';
-import { SongMatch } from './services/api';
+import { CleanMatch, cleanMatch } from './services/api';
+import { formatTime } from './lib/time';
+
+const LISTEN_SECS = 12; // the server gives up after this many 1 s slices
+
+type Outcome =
+    | { kind: 'match'; match: CleanMatch; took: number }
+    | { kind: 'nomatch' }
+    | { kind: 'blocked'; source: AudioSource };
+
+function ListenClock({ start }: { start: number }) {
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), 250);
+        return () => clearInterval(id);
+    }, []);
+    const sec = start ? Math.max(0, (now - start) / 1000) : 0;
+    return (
+        <div className="status" aria-hidden="true">
+            <span>{formatTime(sec)}</span>
+            <span className="bar"><i style={{ width: `${Math.min(100, (sec / LISTEN_SECS) * 100)}%` }} /></span>
+        </div>
+    );
+}
 
 function App() {
-    const { isRecording, startContinuousRecording, stopRecording, error: recorderError } = useAudioRecorder();
-    const { isConnected, connect, disconnect, startSession, sendChunk, lastMatch, noMatchAt, error: wsError } = useWebSocketAudio();
+    const { isRecording, startContinuousRecording, stopRecording, stream } = useAudioRecorder();
+    const { isConnected, connect, disconnect, startSession, sendChunk, lastMatch, noMatchAt } = useWebSocketAudio();
 
     const [audioSource, setAudioSource] = useState<AudioSource>('microphone');
-    const [match, setMatch] = useState<SongMatch | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [status, setStatus] = useState<string>('');
+    const [outcome, setOutcome] = useState<Outcome | null>(null);
+    const [starting, setStarting] = useState(false); // waiting for the browser to grant the sound
+    const [listenStart, setListenStart] = useState(0);
+    const startRef = useRef(0);
+    const active = useRef(false); // a listening session is running; replies after Stop are ignored
 
-    // 1. Persistent Connection: Connect on mount
+    const view: View = isRecording ? 'listening' : outcome ? outcome.kind : isConnected ? 'idle' : 'waking';
+
+    // Keep one socket open; the hook reconnects (and wakes a sleeping server) on its own
     useEffect(() => {
         connect();
-        return () => {
-            disconnect();
-        };
+        return () => disconnect();
     }, [connect, disconnect]);
 
-    // Handle matching
+    const finish = useCallback((next: Outcome | null) => {
+        active.current = false;
+        stopRecording();
+        setOutcome(next);
+    }, [stopRecording]);
+
     useEffect(() => {
-        if (lastMatch) {
-            setMatch(lastMatch);
-            setStatus('Match found!');
-            stopRecording();
-            // Do NOT disconnect here, keep the socket open
+        if (lastMatch && active.current) {
+            finish({ kind: 'match', match: cleanMatch(lastMatch), took: (Date.now() - startRef.current) / 1000 });
         }
-    }, [lastMatch, stopRecording]);
+    }, [lastMatch, finish]);
 
-    // The server gave up after ~12 s of audio without a match
     useEffect(() => {
-        if (noMatchAt) {
-            stopRecording();
-            setStatus('');
-            setError('No match found. Is this song in our catalog?');
-        }
-    }, [noMatchAt, stopRecording]);
+        if (noMatchAt && active.current) finish({ kind: 'nomatch' });
+    }, [noMatchAt, finish]);
 
-    // Handle errors
+    // Audio sent while the socket is down is lost, so end the session and wait for it
     useEffect(() => {
-        if (recorderError) setError(recorderError);
-        if (wsError) setError(wsError);
-    }, [recorderError, wsError]);
+        if (!isConnected && active.current) finish(null);
+    }, [isConnected, finish]);
 
-    const handleToggleListening = async () => {
-        if (isRecording) {
-            stopRecording();
-            setStatus('');
+    const listen = useCallback(async () => {
+        if (active.current) return finish(null); // Stop
+        setOutcome(null);
+        if (!isConnected) return connect();
+        active.current = true;
+        setStarting(true);
+        startSession();
+        const ok = await startContinuousRecording(audioSource, sendChunk, 1000);
+        setStarting(false);
+        if (!active.current) return stopRecording(); // stopped while the browser was asking
+        if (!ok) {
+            active.current = false;
+            setOutcome({ kind: 'blocked', source: audioSource });
             return;
         }
+        startRef.current = Date.now();
+        setListenStart(startRef.current);
+    }, [isConnected, connect, finish, startSession, startContinuousRecording, audioSource, sendChunk, stopRecording]);
 
-        if (!isConnected) {
-            connect(); // the status line shows "Connecting to server..." meanwhile
-            return;
-        }
+    // Space starts and stops, unless a control has focus (it handles Space itself)
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.code !== 'Space' || e.repeat || view === 'waking' || starting) return;
+            if ((e.target as HTMLElement).closest('button, a, input, textarea, select')) return;
+            e.preventDefault();
+            void listen();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [view, starting, listen]);
 
-        setError(null);
-        setMatch(null);
-        setStatus('Listening...');
+    const seg = <AudioSourceToggle audioSource={audioSource} onToggle={setAudioSource} />;
+    const again = (label: string) => (
+        <button className="btn" onClick={listen}><RotateCcw strokeWidth={1.75} />{label}</button>
+    );
 
-        try {
-            // One continuous recording sent in 1 s slices; the server matches the growing
-            // recording every second and replies with a match or, after ~12 s, no_match
-            startSession();
-            await startContinuousRecording(audioSource, sendChunk, 1000);
-
-        } catch (err) {
-            console.error(err);
-            setError('Failed to start listening');
-            setStatus('');
-        }
-    };
+    let copy;
+    if (view === 'waking') {
+        copy = (<>
+            <h1>Dig through your <em>crate.</em></h1>
+            <p className="lede">The server is waking up. One moment.</p>
+        </>);
+    } else if (view === 'idle') {
+        copy = (<>
+            <h1>Dig through your <em>crate.</em></h1>
+            <p className="lede">Play a song near your laptop, or share its tab. Sonica flips through every record in your library and pulls out the one that’s playing.</p>
+            <div className="row">
+                {seg}
+                <button className="btn" onClick={listen} disabled={starting}><Mic strokeWidth={1.75} />Start digging</button>
+            </div>
+            <p className="hint">Scroll or drag the crate to flip by hand · Space to start</p>
+        </>);
+    } else if (view === 'listening') {
+        copy = (<>
+            <h2>Flipping <em>through…</em></h2>
+            <p className="lede">The louder the song, the faster the records go. Keep it playing.</p>
+            <div className="row"><button className="btn ghost" onClick={listen}><Square fill="currentColor" strokeWidth={0} />Stop</button></div>
+        </>);
+    } else if (outcome?.kind === 'match') {
+        const m = outcome.match;
+        copy = (<>
+            <h2>Pulled it <em>out.</em></h2>
+            <p className="lede">{m.untagged ? `${m.title}. Artist not tagged.` : `${m.title}, by ${m.artist}.`}</p>
+            <div className="row">{again('Dig again')}</div>
+        </>);
+    } else if (outcome?.kind === 'nomatch') {
+        copy = (<>
+            <h2>Not in this <em>crate.</em></h2>
+            <p className="lede">This record isn’t in your library. Try another part of the song, or another song.</p>
+            <div className="row">{again('Dig again')}</div>
+        </>);
+    } else {
+        const tab = outcome?.kind === 'blocked' && outcome.source === 'system';
+        copy = (<>
+            <h2>{tab ? <>No tab audio was <em>shared.</em></> : <>The microphone is <em>blocked.</em></>}</h2>
+            <p className="lede">{tab
+                ? 'When Chrome asks, pick the playing tab and turn on “Share tab audio”.'
+                : 'Allow the microphone from the address bar, or switch to Tab audio.'}</p>
+            <div className="row">{seg}{again('Try again')}</div>
+        </>);
+    }
 
     return (
-        <div className="min-h-screen bg-background text-black font-sans flex flex-col overflow-hidden relative">
-            <Header />
-
-            {/* Background Text */}
-            <div className="absolute top-[60px] left-0 right-0 bottom-[80px] flex items-center justify-center pointer-events-none overflow-hidden z-0 opacity-5">
-                <h1 className="text-[20vw] font-bold leading-none text-center whitespace-nowrap">
-                    LISTEN<br />RECOGNIZE
-                </h1>
-            </div>
-
-            {/* Decorative Tags */}
-            <div className="absolute top-[100px] right-[20px] bg-white border border-black px-2 py-1 text-xs font-bold uppercase rotate-[5deg] z-10 hidden md:block">
-                {audioSource === 'microphone' ? 'Microphone Active' : 'System Audio Active'}
-            </div>
-            <div className="absolute bottom-[120px] left-[20px] bg-accent border border-black px-2 py-1 text-xs font-bold uppercase rotate-[-5deg] z-10 hidden md:block">
-                Ready to Scan
-            </div>
-
-            {/* Main Stage */}
-            <main className="flex-1 flex flex-col justify-center items-center relative z-10">
-                {/* Audio Source Toggle */}
-                <div className="mb-8">
-                    <AudioSourceToggle
-                        audioSource={audioSource}
-                        onToggle={setAudioSource}
-                        disabled={isRecording}
-                    />
-                </div>
-
-                <ListenButton
-                    isListening={isRecording}
-                    onClick={handleToggleListening}
-                />
-
-                {/* Status Text */}
-                <div className="mt-8 h-8">
-                    {!isConnected && !status && !error && (
-                        <p className="text-xl font-bold uppercase animate-pulse">Connecting to server...</p>
-                    )}
-                    {status && (
-                        <p className="text-xl font-bold uppercase animate-pulse">{status}</p>
-                    )}
-                    {error && (
-                        <p className="text-xl font-bold uppercase text-red-600 bg-white border border-black px-2">{error}</p>
-                    )}
-                </div>
-
-                <ResultCard match={match} onClose={() => setMatch(null)} />
+        <MotionConfig reducedMotion="user">
+            <a className="skip" href="#main">Skip to content</a>
+            <Crate
+                view={view}
+                stream={stream}
+                match={outcome?.kind === 'match' ? outcome.match : null}
+                took={outcome?.kind === 'match' ? outcome.took : 0}
+            />
+            <header className="top">
+                <a className="brand" href="/">sonica</a>
+                <nav><a className="linkish" href="https://github.com/Vishal4742/Sonica_1">Source code</a></nav>
+            </header>
+            <main id="main" className="side" aria-live="polite">
+                <section className="block" key={view}>{copy}</section>
             </main>
-
-            <Marquee />
-        </div>
+            {view === 'listening' && <ListenClock start={listenStart} />}
+        </MotionConfig>
     );
 }
 
