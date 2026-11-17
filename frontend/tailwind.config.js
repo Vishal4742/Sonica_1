@@ -6,13 +6,16 @@ export default {
     ],
     theme: {
         extend: {
+            // Same values as the CSS variables in src/index.css
             colors: {
-                primary: '#FF4D00',
-                background: '#E0E0E0',
-                accent: '#FFFF00',
+                ground: '#0F3B2E',
+                ink: '#F3EAD7',
+                accent: '#F2B544',
             },
             fontFamily: {
-                sans: ['"Space Grotesk"', 'sans-serif'],
+                sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
+                serif: ['"Instrument Serif"', 'Georgia', 'serif'],
+                mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
             },
         },
     },

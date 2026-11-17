@@ -30,3 +30,35 @@ export const recognizeAudio = async (audioBlob: Blob): Promise<RecognitionRespon
         throw error;
     }
 };
+
+export interface CleanMatch {
+    title: string;
+    artist: string; // "Artist not tagged" when the file has no artist
+    untagged: boolean;
+    pct: number; // the server's confidence, 0–100
+}
+
+// Song files often carry download-site junk in their names. Drop it, read
+// "Artist - Title" when the artist tag is missing, and show " | " as " · ".
+export const cleanMatch = (m: SongMatch): CleanMatch => {
+    let title = m.title.replace(/^\s*video\s*-\s*/i, '');
+    let artist = m.artist;
+    title = title.replace(/\(MP3_.*?\)|\[.*?\]|\(.*?kbps.*?\)|www\..*?\.[a-z]+|\.mp3|\.wav/gi, '').trim();
+    title = title.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    if (artist === 'Unknown' || artist === '') {
+        const sep = title.includes(' - ') ? ' - ' : title.includes(' _ ') ? ' _ ' : null;
+        if (sep) {
+            const parts = title.split(sep);
+            artist = parts[0].trim();
+            title = parts.slice(1).join(sep).trim();
+        }
+    }
+    title = title.replace(/\s*\|\s*/g, ' · ');
+    const untagged = !artist || artist === 'Unknown';
+    return {
+        title,
+        artist: untagged ? 'Artist not tagged' : artist,
+        untagged,
+        pct: Math.min(100, Math.max(0, Math.round(m.score * 100))),
+    };
+};
