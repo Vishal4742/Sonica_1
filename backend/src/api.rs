@@ -12,14 +12,15 @@ use axum::{
     Router,
 };
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-const MATCH_THRESHOLD: i64 = 8;
+const MATCH_THRESHOLD: i64 = 5;
 const MAX_UPLOAD_SIZE: usize = 10_000_000; // 10MB limit for uploads
+const SESSION_SECS: usize = 12; // a live session gives up after this many 1 s slices
 
 #[derive(Clone)]
 pub struct AppState {
@@ -43,6 +44,14 @@ async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl
 async fn handle_socket(mut socket: WebSocket, state: AppState) {
     info!("New WebSocket connection");
 
+    // A client that sends "start" streams one continuous recording in 1 s slices.
+    // Only the first slice carries the container header, so slices are matched
+    // together, and the growing session is retried until a match or SESSION_SECS.
+    // Clients that never send "start" (older frontends) send one complete clip per message.
+    let mut uses_sessions = false;
+    let mut session: Option<Vec<u8>> = None;
+    let mut slices = 0;
+
     while let Some(msg) = socket.recv().await {
         let msg = match msg {
             Ok(msg) => msg,
@@ -52,138 +61,121 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
             }
         };
 
-        match msg {
+        let audio = match msg {
+            Message::Text(_) => {
+                uses_sessions = true;
+                session = Some(Vec::new());
+                slices = 0;
+                continue;
+            }
             Message::Binary(data) => {
-                info!("Received binary data size: {} bytes", data.len());
                 // Security: Max message size check (e.g., 1MB)
                 if data.len() > 1_000_000 {
                     warn!("Message too large, closing connection");
                     return;
                 }
-
-                let state_clone = state.clone();
-
-                let task_result =
-                    tokio::task::spawn_blocking(move || -> Result<Option<MatchResult>> {
-                        // 1. Save to temp
-                        let temp_id = Uuid::new_v4();
-                        let temp_path =
-                            std::env::temp_dir().join(format!("upload_{}.wav", temp_id));
-                        std::fs::write(&temp_path, &data)
-                            .map_err(|e| AppError::Internal(e.to_string()))?;
-
-                        // 2. Preprocess
-                        let processed_path =
-                            std::env::temp_dir().join(format!("processed_{}.wav", temp_id));
-
-                        if let Err(e) = preprocess_audio(
-                            temp_path.to_str().unwrap(),
-                            processed_path.to_str().unwrap(),
-                        ) {
-                            warn!("FFmpeg error: {}", e);
-                            let _ = std::fs::remove_file(&temp_path);
-                            return Err(e);
+                match session.as_mut() {
+                    Some(buf) => {
+                        buf.extend_from_slice(&data);
+                        slices += 1;
+                        if slices < 2 {
+                            continue; // one second is too short to match
                         }
-
-                        // Now decode the processed file
-                        let samples = match crate::fingerprint::decode_audio(
-                            processed_path.to_str().unwrap(),
-                        ) {
-                            Ok(s) => s,
-                            Err(e) => {
-                                warn!("Decode error: {}", e);
-                                let _ = std::fs::remove_file(&temp_path);
-                                let _ = std::fs::remove_file(&processed_path);
-                                return Err(e);
-                            }
-                        };
-
-                        let _ = std::fs::remove_file(temp_path);
-                        let _ = std::fs::remove_file(processed_path);
-
-                        // 3. Fingerprint
-                        let fingerprints = generate_fingerprints(&samples);
-                        info!("Generated {} fingerprints", fingerprints.len());
-
-                        if fingerprints.is_empty() {
-                            return Ok(None);
-                        }
-
-                        // 4. Match
-                        let matches = state_clone.db.find_matches(&fingerprints)?;
-
-                        // Histogram logic
-                        let mut best_song_id = -1;
-                        let mut best_score = 0;
-
-                        for (song_id, offsets) in matches {
-                            let mut histogram = HashMap::new();
-                            let mut max_count = 0;
-                            for (db_offset, query_offset) in offsets {
-                                let relative_offset = (db_offset as i64) - (query_offset as i64);
-                                let count = histogram.entry(relative_offset).or_insert(0);
-                                *count += 1;
-                                if *count > max_count {
-                                    max_count = *count;
-                                }
-                            }
-                            if max_count > best_score {
-                                best_score = max_count;
-                                best_song_id = song_id;
-                            }
-                        }
-
-                        info!("Best score: {}", best_score);
-
-                        if best_score > MATCH_THRESHOLD {
-                            if let Some(metadata) =
-                                state_clone.db.get_song_metadata(best_song_id)?
-                            {
-                                let scale_factor = 15.0;
-                                let normalized_score =
-                                    1.0 - (-(best_score as f32) / scale_factor).exp();
-                                let clamped_score = normalized_score.min(1.0).max(0.0);
-
-                                return Ok(Some(MatchResult {
-                                    title: metadata.title,
-                                    artist: metadata.artist,
-                                    score: clamped_score,
-                                }));
-                            }
-                        }
-
-                        Ok(None)
-                    })
-                    .await;
-
-                match task_result {
-                    Ok(Ok(Some(match_result))) => {
-                        info!(
-                            "Match found: {} - {}",
-                            match_result.artist, match_result.title
-                        );
-                        // Found a match! Send it back
-                        let response = serde_json::json!({
-                            "type": "match",
-                            "match": match_result
-                        });
-                        if let Err(e) = socket.send(Message::Text(response.to_string())).await {
-                            warn!("Failed to send match: {}", e);
-                            break;
-                        }
+                        buf.clone()
                     }
-                    Ok(Err(e)) => {
-                        warn!("Processing error: {}", e);
-                    }
-                    _ => {} // No match or task error
+                    None if uses_sessions => continue, // slice still in flight after a reply
+                    None => data,
                 }
             }
-            Message::Close(_) => {
-                return;
+            Message::Close(_) => return,
+            _ => continue,
+        };
+
+        let db = Arc::clone(&state.db);
+        let found = match tokio::task::spawn_blocking(move || identify(&db, &audio)).await {
+            Ok(Ok(found)) => found,
+            Ok(Err(e)) => {
+                warn!("Processing error: {}", e);
+                None
             }
-            _ => {}
+            Err(e) => {
+                warn!("Recognition task failed: {}", e);
+                None
+            }
+        };
+
+        let reply = match found {
+            Some(m) => serde_json::json!({ "type": "match", "match": m }),
+            None if session.is_some() && slices >= SESSION_SECS => {
+                serde_json::json!({ "type": "no_match" })
+            }
+            None => continue,
+        };
+        session = None; // a reply ends the session
+        if let Err(e) = socket.send(Message::Text(reply.to_string())).await {
+            warn!("Failed to send reply: {}", e);
+            break;
         }
     }
+}
+
+/// Deletes the file when dropped, so error paths clean up too.
+struct TempFile(PathBuf);
+
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// Decode, fingerprint and match one clip. Blocking work: call it from spawn_blocking.
+fn identify(db: &Database, audio: &[u8]) -> Result<Option<MatchResult>> {
+    let id = Uuid::new_v4();
+    let input = TempFile(std::env::temp_dir().join(format!("upload_{}", id)));
+    let output = TempFile(std::env::temp_dir().join(format!("processed_{}.wav", id)));
+    std::fs::write(&input.0, audio)?;
+    preprocess_audio(input.0.to_str().unwrap(), output.0.to_str().unwrap())?;
+    let samples = crate::fingerprint::decode_audio(output.0.to_str().unwrap())?;
+
+    let fingerprints = generate_fingerprints(&samples);
+    info!("Generated {} fingerprints", fingerprints.len());
+    if fingerprints.is_empty() {
+        return Ok(None);
+    }
+
+    // Histogram of offsets: a real match lines up many hashes at one time offset
+    let mut best_song_id = -1;
+    let mut best_score = 0;
+    for (song_id, offsets) in db.find_matches(&fingerprints)? {
+        let mut histogram = HashMap::new();
+        let mut max_count = 0;
+        for (db_offset, query_offset) in offsets {
+            let count = histogram
+                .entry(db_offset as i64 - query_offset as i64)
+                .or_insert(0);
+            *count += 1;
+            max_count = max_count.max(*count);
+        }
+        if max_count > best_score {
+            best_score = max_count;
+            best_song_id = song_id;
+        }
+    }
+    info!("Best score: {} (threshold {})", best_score, MATCH_THRESHOLD);
+
+    if best_score <= MATCH_THRESHOLD {
+        return Ok(None);
+    }
+    let Some(song) = db.get_song_metadata(best_song_id)? else {
+        return Ok(None);
+    };
+    info!("Match: {} - {} ({} aligned hashes)", song.artist, song.title, best_score);
+    Ok(Some(MatchResult {
+        title: song.title,
+        artist: song.artist,
+        // Map the aligned-hash count onto 0-1 for display (frontend shows a percentage)
+        score: (1.0 - (-(best_score as f32) / 5.0).exp()).clamp(0.0, 1.0),
+    }))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -233,98 +225,11 @@ async fn recognize(
         )));
     }
 
-    // Save to temp file
-    let temp_input = format!("temp/{}", Uuid::new_v4());
-    let temp_output = format!("temp/{}_processed.wav", Uuid::new_v4());
-
-    fs::create_dir_all("temp").await?;
-    fs::write(&temp_input, &audio_data).await?;
-
-    // Preprocess with FFmpeg
-    preprocess_audio(&temp_input, &temp_output)?;
-
-    // Decode and Fingerprint
-    let samples = crate::fingerprint::decode_audio(&temp_output)?;
-    let fingerprints = generate_fingerprints(&samples);
-
-    // Clean up temp files
-    let _ = fs::remove_file(&temp_input).await;
-    let _ = fs::remove_file(&temp_output).await;
-
-    if fingerprints.is_empty() {
-        return Ok(Json(RecognitionResponse { r#match: None }));
-    }
-
-    // Find matches in DB
-    let matches = state.db.find_matches(&fingerprints)?;
-
-    // Histogram of Offsets Algorithm
-    let mut best_song_id = -1;
-    let mut best_score = 0;
-
-    for (song_id, offsets) in matches {
-        let mut histogram = HashMap::new();
-        let mut max_count = 0;
-
-        for (db_offset, query_offset) in offsets {
-            // relative_offset = db_offset - query_offset
-            // We use wrapping arithmetic or offset to avoid negative numbers if needed,
-            // but here we can just use i64.
-            let relative_offset = (db_offset as i64) - (query_offset as i64);
-            let count = histogram.entry(relative_offset).or_insert(0);
-            *count += 1;
-            if *count > max_count {
-                max_count = *count;
-            }
-        }
-
-        if max_count > best_score {
-            best_score = max_count;
-            best_song_id = song_id;
-        }
-    }
-
-    // Threshold for a match
-    // Need at least X matching points aligned in time
-    if best_score > MATCH_THRESHOLD {
-        if let Some(metadata) = state.db.get_song_metadata(best_song_id)? {
-            // Normalize score to 0-1 range (frontend will multiply by 100 for percentage)
-            // The score is the count of matching fingerprint points aligned in time
-            // Use a logarithmic scale to map to 0-1 range more naturally
-            // Formula: normalized = 1 - exp(-score / scale_factor)
-            // This ensures scores are always between 0 and 1
-
-            // Scale factor: higher values = slower growth toward 1.0
-            // For score of 25, we want ~0.85, so: 1 - exp(-25/15) ≈ 0.81
-            // For score of 40, we want ~0.95, so: 1 - exp(-40/15) ≈ 0.93
-            let scale_factor = 15.0;
-            let normalized_score = 1.0 - (-(best_score as f32) / scale_factor).exp();
-
-            // Clamp to ensure it's always between 0 and 1
-            let clamped_score = normalized_score.min(1.0).max(0.0);
-
-            info!(
-                "Match found: {} - {} (raw score: {}, confidence: {:.1}%)",
-                metadata.title,
-                metadata.artist,
-                best_score,
-                clamped_score * 100.0
-            );
-            return Ok(Json(RecognitionResponse {
-                r#match: Some(MatchResult {
-                    title: metadata.title,
-                    artist: metadata.artist,
-                    score: clamped_score, // Return as 0-1 range (frontend multiplies by 100)
-                }),
-            }));
-        }
-    }
-
-    warn!(
-        "No match found (best score: {}, threshold: {})",
-        best_score, MATCH_THRESHOLD
-    );
-    Ok(Json(RecognitionResponse { r#match: None }))
+    let db = Arc::clone(&state.db);
+    let found = tokio::task::spawn_blocking(move || identify(&db, &audio_data))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??;
+    Ok(Json(RecognitionResponse { r#match: found }))
 }
 
 async fn upload(

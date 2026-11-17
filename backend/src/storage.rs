@@ -10,6 +10,11 @@ pub struct Database {
 impl Database {
     pub fn new(db_path: &str) -> Result<Self> {
         let conn = Connection::open(db_path)?;
+        // Speed up bulk inserts: WAL journaling + relaxed sync + larger page cache.
+        // Safe for this workload (fingerprints are rebuildable from source audio).
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA cache_size=-8000;",
+        )?;
         let db = Database {
             conn: Mutex::new(conn),
         };

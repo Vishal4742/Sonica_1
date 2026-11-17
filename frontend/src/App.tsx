@@ -10,7 +10,7 @@ import { SongMatch } from './services/api';
 
 function App() {
     const { isRecording, startContinuousRecording, stopRecording, error: recorderError } = useAudioRecorder();
-    const { isConnected, connect, disconnect, sendChunk, lastMatch, error: wsError } = useWebSocketAudio();
+    const { isConnected, connect, disconnect, startSession, sendChunk, lastMatch, noMatchAt, error: wsError } = useWebSocketAudio();
 
     const [audioSource, setAudioSource] = useState<AudioSource>('microphone');
     const [match, setMatch] = useState<SongMatch | null>(null);
@@ -35,6 +35,15 @@ function App() {
         }
     }, [lastMatch, stopRecording]);
 
+    // The server gave up after ~12 s of audio without a match
+    useEffect(() => {
+        if (noMatchAt) {
+            stopRecording();
+            setStatus('');
+            setError('No match found. Is this song in our catalog?');
+        }
+    }, [noMatchAt, stopRecording]);
+
     // Handle errors
     useEffect(() => {
         if (recorderError) setError(recorderError);
@@ -49,9 +58,7 @@ function App() {
         }
 
         if (!isConnected) {
-            setError('Connecting to server...');
-            // Try to reconnect if not connected?
-            connect();
+            connect(); // the status line shows "Connecting to server..." meanwhile
             return;
         }
 
@@ -60,10 +67,10 @@ function App() {
         setStatus('Listening...');
 
         try {
-            // Start Continuous Recording
-            await startContinuousRecording(audioSource, (blob) => {
-                sendChunk(blob);
-            }, 3000); // Send chunk every 3 seconds
+            // One continuous recording sent in 1 s slices; the server matches the growing
+            // recording every second and replies with a match or, after ~12 s, no_match
+            startSession();
+            await startContinuousRecording(audioSource, sendChunk, 1000);
 
         } catch (err) {
             console.error(err);
@@ -109,6 +116,9 @@ function App() {
 
                 {/* Status Text */}
                 <div className="mt-8 h-8">
+                    {!isConnected && !status && !error && (
+                        <p className="text-xl font-bold uppercase animate-pulse">Connecting to server...</p>
+                    )}
                     {status && (
                         <p className="text-xl font-bold uppercase animate-pulse">{status}</p>
                     )}

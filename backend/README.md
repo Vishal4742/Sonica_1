@@ -10,13 +10,14 @@ pinned: false
 # Sonica Backend
 
 
-Fast music recognition backend in Rust with MFCC fingerprinting, automatic preprocessing, and in-memory caching.
+Rust backend for local music recognition. It preprocesses audio with FFmpeg, derives STFT peak-pair fingerprints, and matches them against an indexed SQLite database.
 
 ## Features
 
-- **Fast Recognition**: < 0.5s recognition time using cosine similarity on MFCC fingerprints
-- **Auto-Detection**: Automatically processes new songs added to `songs/` directory
-- **In-Memory Cache**: All fingerprints loaded at startup for instant matching
+- **Peak-Pair Fingerprinting**: Uses an STFT spectrogram, adaptive per-band peaks, and 32-bit peak-pair hashes
+- **Indexed Matching**: Looks up hashes in SQLite and scores candidates with a histogram of time offsets
+- **Auto-Detection**: Automatically indexes new songs added to `songs/` directory
+- **SQLite Storage**: Stores song metadata and fingerprints locally; WAL mode supports batch insertion
 - **Multiple Formats**: Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS, WMA
 
 ## Prerequisites
@@ -135,19 +136,16 @@ Upload a new song file.
 
 ## How It Works
 
-1. **Startup**: Server loads all existing songs from database and `songs/` directory
+1. **Startup**: Server opens the local SQLite database and watches the `songs/` directory
 2. **Preprocessing**: New songs are converted to mono 16kHz WAV using FFmpeg
-3. **Fingerprinting**: MFCC (Mel-Frequency Cepstral Coefficients) features are extracted
-4. **Caching**: All fingerprints stored in-memory for fast recognition
-5. **Recognition**: Query audio clip is fingerprinted and compared using cosine similarity
+3. **Fingerprinting**: An STFT produces a spectrogram, from which the backend derives peak-pair hashes
+4. **Storage**: Each hash and its time offset are stored in SQLite with an index on the hash value
+5. **Recognition**: Query hashes retrieve candidates from SQLite; a histogram of relative offsets selects the best match
 6. **Auto-Detection**: File watcher automatically processes new files added to `songs/` directory
 
-## Performance Targets
+## Measured Configuration
 
-- Recognition: < 0.5s
-- New Song Preprocessing: 1-2s
-- Startup Load (1000 songs): < 1.5s
-- Memory Usage: < 50 MB
+The accompanying paper reports measurements for a 50-song local catalog. Runtime depends on the catalog, audio content, hardware, and query length; this repository does not define fixed performance guarantees.
 
 ## Deployment
 

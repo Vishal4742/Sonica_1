@@ -10,8 +10,10 @@ interface UseWebSocketAudioReturn {
     isConnected: boolean;
     connect: () => void;
     disconnect: () => void;
+    startSession: () => void;
     sendChunk: (blob: Blob) => void;
     lastMatch: MatchResult | null;
+    noMatchAt: number | null;
     error: string | null;
 }
 
@@ -19,14 +21,16 @@ export const useWebSocketAudio = (): UseWebSocketAudioReturn => {
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [lastMatch, setLastMatch] = useState<MatchResult | null>(null);
+    const [noMatchAt, setNoMatchAt] = useState<number | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
+    const closingRef = useRef(false); // true when we close the socket on purpose
 
     const connect = useCallback(() => {
         // Prevent multiple connections
         if (socketRef.current && (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)) {
-            console.log('WebSocket already connected or connecting');
             return;
         }
+        closingRef.current = false;
 
         try {
             // Determine WebSocket URL based on VITE_API_URL
@@ -46,8 +50,9 @@ export const useWebSocketAudio = (): UseWebSocketAudioReturn => {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'match') {
-                        console.log('Match received:', data.match);
                         setLastMatch(data.match);
+                    } else if (data.type === 'no_match') {
+                        setNoMatchAt(Date.now());
                     }
                 } catch (e) {
                     console.error('Error parsing WebSocket message:', e);
@@ -57,13 +62,13 @@ export const useWebSocketAudio = (): UseWebSocketAudioReturn => {
             socket.onclose = () => {
                 console.log('WebSocket Disconnected');
                 setIsConnected(false);
-                // Don't nullify socketRef here immediately, as it might cause race conditions with pending sends
-                // or let the next connect call handle it.
+                // A free Hugging Face Space sleeps when idle and drops connections when it
+                // restarts. Keep retrying: each attempt also wakes the Space up.
+                if (!closingRef.current) setTimeout(connect, 3000);
             };
 
             socket.onerror = (event) => {
-                console.error('WebSocket Error:', event);
-                setError('WebSocket connection error');
+                console.error('WebSocket Error:', event); // onclose retries
             };
 
             socketRef.current = socket;
@@ -74,6 +79,7 @@ export const useWebSocketAudio = (): UseWebSocketAudioReturn => {
     }, []);
 
     const disconnect = useCallback(() => {
+        closingRef.current = true;
         if (socketRef.current) {
             socketRef.current.close();
             socketRef.current = null;
@@ -81,9 +87,15 @@ export const useWebSocketAudio = (): UseWebSocketAudioReturn => {
         }
     }, []);
 
+    // Tells the server a new recording starts, so it joins the slices that follow
+    const startSession = useCallback(() => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send('start');
+        }
+    }, []);
+
     const sendChunk = useCallback((blob: Blob) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-            console.log('WebSocket: Sending blob of size', blob.size);
             socketRef.current.send(blob);
         } else {
             console.warn('WebSocket: Cannot send, socket not open. State:', socketRef.current?.readyState);
@@ -93,11 +105,12 @@ export const useWebSocketAudio = (): UseWebSocketAudioReturn => {
     // Cleanup on unmount
     useEffect(() => {
         return () => {
+            closingRef.current = true;
             if (socketRef.current) {
                 socketRef.current.close();
             }
         };
     }, []);
 
-    return { isConnected, connect, disconnect, sendChunk, lastMatch, error };
+    return { isConnected, connect, disconnect, startSession, sendChunk, lastMatch, noMatchAt, error };
 };
